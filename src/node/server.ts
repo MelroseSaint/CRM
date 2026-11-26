@@ -1,11 +1,25 @@
 // Standalone Node server: the same API and SPA, running on libSQL.
 // Usage: DATABASE_URL=file:.data/anvil.db npm run dev:node
 
+import { mkdirSync } from 'node:fs';
 import { serve } from '@hono/node-server';
 import { app } from '../index';
+import type { Env } from '../lib/db';
 import { loadEnv } from './env';
+import { diskAssets } from './static';
 
-const env = loadEnv();
+const loaded = loadEnv();
+
+// A file: database needs its directory before the first query; libSQL opens the
+// connection lazily, so creating it here is early enough.
+const url = process.env.DATABASE_URL?.trim() || 'file:.data/anvil.db';
+if (url.startsWith('file:')) {
+  const path = url.slice('file:'.length);
+  const directory = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+  if (directory) mkdirSync(directory, { recursive: true });
+}
+
+const env: Env = { ...loaded, ASSETS: diskAssets(process.env.ASSETS_DIR?.trim() || 'web/dist') };
 const port = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? '0.0.0.0';
 

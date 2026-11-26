@@ -4,11 +4,9 @@
 // file: URL for local development and tests. DATABASE_AUTH_TOKEN is required for
 // Turso. On Cloudflare none of this is used: wrangler binds D1 and R2 directly.
 
-import { mkdirSync } from 'node:fs';
 import type { Env } from '../lib/db';
 import { createLibsqlDb } from './db-libsql';
 import { dbFileStore } from './files';
-import { diskAssets } from './static';
 
 const DEFAULT_DATABASE_URL = 'file:.data/anvil.db';
 
@@ -34,21 +32,15 @@ export function loadEnv(): Env {
 
   const url = process.env.DATABASE_URL?.trim() || DEFAULT_DATABASE_URL;
   const authToken = process.env.DATABASE_AUTH_TOKEN?.trim() || undefined;
-  if (url.startsWith('file:')) {
-    const path = url.slice('file:'.length);
-    const directory = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-    if (directory) mkdirSync(directory, { recursive: true });
-  }
-
   const db = createLibsqlDb(url, authToken);
-  const assetsDirectory = process.env.ASSETS_DIR?.trim() || 'web/dist';
 
+  // The SPA is served by the `web` service on Vercel, so no disk assets here;
+  // the Node server attaches its own AssetStore.
   cached = {
     DB: db,
     FILES: dbFileStore(db),
     APP_NAME: process.env.APP_NAME?.trim() || 'Anvil Ops',
     APP_ENV: process.env.VERCEL ? 'vercel' : 'node',
-    ASSETS: diskAssets(assetsDirectory),
   } satisfies Env;
   return cached;
 }
