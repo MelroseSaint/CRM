@@ -2,7 +2,7 @@
   "name": "anvil-ops",
   "version": "1.0.0",
   "private": true,
-  "description": "Anvil Ops \u2014 studio operations platform (React + Cloudflare Workers)",
+  "description": "Anvil Ops — studio operations platform (React + Hono; Cloudflare Workers or Node/Vercel)",
   "engines": {
     "node": ">=22.6.0"
   },
@@ -15,17 +15,23 @@
     "db:init": "wrangler d1 execute anvil-ops --local --file=src/db/schema.sql",
     "db:init:remote": "wrangler d1 execute anvil-ops --remote --file=src/db/schema.sql",
     "db:demo": "wrangler d1 execute anvil-ops --local --file=scripts/demo.sql",
-    "typecheck": "tsc --noEmit && npm --prefix web run typecheck",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && npm --prefix web run typecheck",
     "test": "npm run typecheck && npm run test:api",
     "test:api": "node scripts/test-api.mts",
     "sdk:build": "cd sdk && npm install --no-audit --no-fund && npm run build",
-    "sdk:typecheck": "cd sdk && npm install --no-audit --no-fund && npm run typecheck"
+    "sdk:typecheck": "cd sdk && npm install --no-audit --no-fund && npm run typecheck",
+    "dev:node": "tsx src/node/server.ts",
+    "db:init:node": "tsx scripts/db-init-node.mts"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@libsql/client": "^0.18.0",
     "hono": "^4.6.14"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261123.1",
+    "@types/node": "^26.6.11",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "wrangler": "^4.20.0"
   }

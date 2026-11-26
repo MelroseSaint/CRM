@@ -1,7 +1,7 @@
 // Request helpers shared by HTML routes: flash redirects, form parsing, pagination, nav counts.
 
 import type { AppContext } from './auth';
-import { all, one, scalar, type Env } from './db';
+import { all, one, scalar, type Env, Db} from './db';
 import { clamp, toInt } from './util';
 
 export interface Flash {
@@ -136,7 +136,7 @@ export function totalPages(total: number, perPage: number): number {
   return Math.max(1, Math.ceil(total / perPage));
 }
 
-export async function navCounts(db: D1Database): Promise<Record<string, number>> {
+export async function navCounts(db: Db): Promise<Record<string, number>> {
   const row = await one<Record<string, number>>(
     db,
     `SELECT
@@ -153,7 +153,7 @@ export async function navCounts(db: D1Database): Promise<Record<string, number>>
   return out;
 }
 
-export async function setting(db: D1Database, key: string, fallback = ''): Promise<string> {
+export async function setting(db: Db, key: string, fallback = ''): Promise<string> {
   const n = await scalar(db, `SELECT 1 FROM settings WHERE key = ?`, key).catch(() => 0);
   if (!n) return fallback;
   const rows = await all<{ value: string }>(db, 'SELECT value FROM settings WHERE key = ?', key);

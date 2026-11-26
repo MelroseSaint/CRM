@@ -6,8 +6,9 @@ integration API that lets each website you build report back to the platform.
 
 The application is a React single-page app (Vite + TypeScript, React Router) served by a single
 Cloudflare Worker that exposes a JSON API. Data lives in D1, files in R2. The Worker also serves the
-versioned integration API that client websites call. There is no mock data: every figure on every
-screen comes from a record you created.
+versioned integration API that client websites call. The same API runs on Node/Vercel with a libSQL
+database (see [Run it on Vercel](#run-it-on-vercel-node--libsql)). There is no mock data: every
+figure on every screen comes from a record you created.
 
 ```
 src/
@@ -87,6 +88,45 @@ duplicates data and can trip foreign keys. Its two public accounts are inserted 
 database still has no users, and the sign-in banner only appears when both exist, so loading it onto
 a database that already has accounts never adds a known-password administrator.
 
+## Run it on Vercel (Node + libSQL)
+
+The API is not tied to Cloudflare. `src/vercel.ts` serves the same Hono application as a Vercel
+function, and `src/node/` supplies the pieces Cloudflare used to provide: the database, document
+storage and the scheduled jobs. `vercel.json` declares two Vercel Services — `app` (this repo,
+framework `hono`, entrypoint `src/vercel.ts`) for `/app/api` and `/api`, and `web` (`web/`, Vite) for
+the built SPA — and a cron job that calls `/api/cron` every 15 minutes.
+
+Use a libSQL database (Turso) rather than Postgres: the schema and every query are SQLite, so the
+SQL is unchanged. Set these environment variables in the Vercel project:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | `libsql://…` or `https://…` database URL |
+| `DATABASE_AUTH_TOKEN` | database token for that URL |
+| `CRON_SECRET` | shared secret; `/api/cron` rejects requests without `Authorization: Bearer <secret>` |
+
+Apply the shared schema to the database once, then deploy:
+
+```bash
+DATABASE_URL=libsql://… DATABASE_AUTH_TOKEN=… npm run db:init:node
+vercel deploy            # Services are in beta; inspect the build logs on the first deploy
+```
+
+On Vercel, uploaded documents are stored in the `file_blobs` table (same key/value contract as R2,
+still capped at 20 MB per file), because a serverless function has no R2 binding. Local Node runs the
+identical runtime:
+
+```bash
+DATABASE_URL=file:.data/anvil.db npm run db:init:node
+DATABASE_URL=file:.data/anvil.db npm run dev:node   # http://localhost:3000
+```
+
+Without `CRON_SECRET` the cron route refuses to run when `VERCEL` is set, so a deployment never runs
+scheduled work unauthenticated; local Node allows it for convenience. Vercel Hobby plans only allow
+daily cron schedules — change `crons` in `vercel.json` if the project is on Hobby. The Cloudflare
+Worker remains the default deployment: `wrangler.jsonc`, D1, R2 and the `scheduled` handler are
+untouched.
+
 ## Test it
 
 ```bash
@@ -129,7 +169,9 @@ not a qualified e-signature, and manually recorded acceptances are labelled as e
 state (`reported`). Reported values never overwrite measured ones; both are shown side by side.
 
 **Monitoring** runs from the Worker's cron trigger (`*/15 * * * *`): due website checks, webhook
-retries and the overdue-invoice sweep. Manual checks are available from the website screen.
+retries and the overdue-invoice sweep. On Vercel the same jobs run from `/api/cron`, called by the
+cron entry in `vercel.json` and guarded by `CRON_SECRET`. Manual checks are available from the
+website screen.
 
 **Security**: PBKDF2-SHA256 (150k iterations) password hashes, hashed session IDs in HttpOnly cookies
 (`SameSite=None; Secure` over HTTPS so the app also works inside an embedded preview frame, `Lax`

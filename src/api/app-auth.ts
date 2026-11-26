@@ -147,7 +147,7 @@ export function appAuthRoutes() {
       'active',
       new Date().toISOString(),
     );
-    const id = Number(res.meta.last_row_id ?? 0);
+    const id = Number(res.meta?.last_row_id ?? 0);
     if (business) await setSetting(c.env.DB, 'business_name', business);
     await createSession(c, id, clientIp(c), c.req.header('user-agent') ?? '');
     await audit(c, 'auth.setup', 'user', id, { email });

@@ -556,3 +556,14 @@ INSERT OR IGNORE INTO settings(key, value) VALUES
   ('overdue_grace_days', '0'),
   ('api_rate_limit_per_minute', '120'),
   ('portal_welcome', 'Welcome to your project portal.');
+
+-- ---------------------------------------------------------------- document blobs (Node/Vercel runtime)
+-- Cloudflare keeps uploads in R2. Node and Vercel have no R2 binding, so the
+-- same key/value contract is stored here; document routes are unchanged.
+CREATE TABLE IF NOT EXISTS file_blobs (
+  key          TEXT PRIMARY KEY,
+  content      BLOB NOT NULL,
+  content_type TEXT,
+  size         INTEGER NOT NULL,
+  created_at   TEXT NOT NULL
+);

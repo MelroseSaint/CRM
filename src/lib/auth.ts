@@ -3,7 +3,7 @@
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { Env } from './db';
-import { all, one, run } from './db';
+import { all, one, run, Db} from './db';
 import { base64url, nowIso, randomToken, sha256Hex, timingSafeEqual } from './util';
 
 export type Role = 'admin' | 'staff' | 'client';
@@ -197,7 +197,7 @@ export async function audit(
   );
 }
 
-export async function countRecentLoginFailures(db: D1Database, email: string, ip: string): Promise<number> {
+export async function countRecentLoginFailures(db: Db, email: string, ip: string): Promise<number> {
   const since = new Date(Date.now() - 15 * 60_000).toISOString();
   const rows = await all<{ c: number }>(
     db,
@@ -210,7 +210,7 @@ export async function countRecentLoginFailures(db: D1Database, email: string, ip
   return Number(rows[0]?.c ?? 0);
 }
 
-export async function recordLoginAttempt(db: D1Database, email: string, ip: string, success: boolean): Promise<void> {
+export async function recordLoginAttempt(db: Db, email: string, ip: string, success: boolean): Promise<void> {
   await run(
     db,
     'INSERT INTO login_attempts(email, ip, success, created_at) VALUES(?,?,?,?)',

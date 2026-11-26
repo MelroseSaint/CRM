@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import type { AppVars } from '../lib/auth';
 import { audit, hashPassword } from '../lib/auth';
 import type { Env } from '../lib/db';
-import { all, insert, one, run, scalar } from '../lib/db';
+import { all, insert, one, run, scalar, Db} from '../lib/db';
 import { ownedRow } from '../lib/portal-scope';
 import { nowIso, randomToken, today } from '../lib/util';
 import {
@@ -618,7 +618,7 @@ export function appPeopleRoutes() {
   return app;
 }
 
-async function syncTags(db: D1Database, clientId: number, tags: string | null): Promise<void> {
+async function syncTags(db: Db, clientId: number, tags: string | null): Promise<void> {
   await run(db, 'DELETE FROM client_tags WHERE client_id = ?', clientId);
   for (const tag of (tags ?? '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 40)) {
     await run(db, 'INSERT OR IGNORE INTO client_tags(client_id, tag) VALUES(?,?)', clientId, tag);

@@ -60,3 +60,55 @@ jobs:
       - name: Worker log on failure
         if: failure()
         run: tail -100 /tmp/worker.log
+
+  node-runtime:
+    name: Node runtime (libSQL) on a clean clone
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: true
+      DATABASE_URL: file:.data/ci.db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install the Node dependencies
+        run: npm ci
+
+      - name: Install the React app dependencies
+        run: npm run web:install
+
+      - name: Create the libSQL database
+        run: npm run db:init:node
+
+      - name: Build the React app
+        run: npm run build
+
+      - name: Start the Node server
+        run: |
+          npm run dev:node > /tmp/node.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/v1/health > /dev/null; then
+              echo "Node server ready after ${attempt} checks"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Node server did not become ready" >&2
+          tail -50 /tmp/node.log >&2
+          exit 1
+
+      - name: Run the integration suite
+        run: npm run test:api
+
+      - name: Node server log on failure
+        if: failure()
+        run: tail -100 /tmp/node.log

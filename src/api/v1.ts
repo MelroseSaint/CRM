@@ -338,7 +338,7 @@ export function apiV1Routes(): ApiApp {
         eventKey,
         nowIso(),
       );
-      if ((res.meta.changes ?? 0) > 0) {
+      if ((res.meta?.changes ?? 0) > 0) {
         accepted += 1;
         if (type === 'error') {
           await emitEvent(c.env, api.websiteId, 'website.error', { website_id: api.websiteId, message: title, detail, occurred_at: ev.occurred_at ?? nowIso() });
@@ -383,7 +383,7 @@ export function apiV1Routes(): ApiApp {
         .filter(Boolean).join(' · '),
       'integration', eventKey, nowIso(),
     );
-    const duplicate = (res.meta.changes ?? 0) === 0;
+    const duplicate = (res.meta?.changes ?? 0) === 0;
 
     if (!duplicate && status === 'succeeded') {
       await run(

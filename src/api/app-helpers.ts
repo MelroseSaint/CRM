@@ -2,7 +2,7 @@
 // The proprietary integration API lives separately at /api/v1.
 
 import type { AppContext, AuthUser } from '../lib/auth';
-import { all, one, scalar } from '../lib/db';
+import { all, one, scalar, Db} from '../lib/db';
 import { clamp, toInt } from '../lib/util';
 
 export type JsonBody = Record<string, unknown>;
@@ -167,10 +167,10 @@ export async function clientOwned<T extends { client_id: number | null }>(
   return one<T>(c.env.DB, `SELECT * FROM ${table} WHERE id = ? AND client_id = ?`, id, clientId);
 }
 
-export function count(db: D1Database, sql: string, ...params: (string | number | null)[]): Promise<number> {
+export function count(db: Db, sql: string, ...params: (string | number | null)[]): Promise<number> {
   return scalar(db, sql, ...params);
 }
 
-export function rows<T>(db: D1Database, sql: string, ...params: (string | number | null)[]): Promise<T[]> {
+export function rows<T>(db: Db, sql: string, ...params: (string | number | null)[]): Promise<T[]> {
   return all<T>(db, sql, ...params);
 }

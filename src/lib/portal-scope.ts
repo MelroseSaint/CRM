@@ -129,7 +129,7 @@ export async function ownedUpdate(
     id,
     clientId,
   );
-  return Number(result.meta.changes ?? 0) > 0;
+  return Number(result.meta?.changes ?? 0) > 0;
 }
 
 /**

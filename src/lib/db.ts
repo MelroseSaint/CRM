@@ -1,17 +1,51 @@
-// Thin, typed data-access helpers over D1.
+// Thin, typed data-access helpers over a small SQL database interface.
+//
+// The same helpers run on Cloudflare D1 (Worker) and on libSQL/SQLite (Node and
+// Vercel) because both expose the prepare/bind/all/first/run shape declared here.
 
-export interface Env {
-  DB: D1Database;
-  FILES: R2Bucket;
-  APP_NAME?: string;
-  APP_ENV?: string;
-  ASSETS?: Fetcher;
+export interface DbStatement {
+  bind(...values: unknown[]): DbStatement;
+  all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
+  run(): Promise<{ success?: boolean; meta?: { last_row_id?: number; changes?: number } }>;
 }
 
-export type Param = string | number | null;
+export interface Db {
+  prepare(sql: string): DbStatement;
+}
+
+export interface StoredFile {
+  body: ReadableStream;
+  size?: number;
+  httpMetadata?: { contentType?: string };
+}
+
+export interface FileStore {
+  put(
+    key: string,
+    value: ReadableStream | ArrayBuffer | Uint8Array,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<unknown>;
+  get(key: string): Promise<StoredFile | null>;
+  delete(key: string): Promise<unknown>;
+}
+
+export interface AssetStore {
+  fetch(input: Request | string): Promise<Response>;
+}
+
+export interface Env {
+  DB: Db;
+  FILES: FileStore;
+  APP_NAME?: string;
+  APP_ENV?: string;
+  ASSETS?: AssetStore;
+}
+
+export type Param = string | number | null | Uint8Array | ArrayBuffer;
 
 export async function all<T = Record<string, unknown>>(
-  db: D1Database,
+  db: Db,
   sql: string,
   ...params: Param[]
 ): Promise<T[]> {
@@ -22,7 +56,7 @@ export async function all<T = Record<string, unknown>>(
 }
 
 export async function one<T = Record<string, unknown>>(
-  db: D1Database,
+  db: Db,
   sql: string,
   ...params: Param[]
 ): Promise<T | null> {
@@ -32,35 +66,35 @@ export async function one<T = Record<string, unknown>>(
 }
 
 export async function run(
-  db: D1Database,
+  db: Db,
   sql: string,
   ...params: Param[]
-): Promise<D1Result> {
+): Promise<{ success?: boolean; meta?: { last_row_id?: number; changes?: number } }> {
   const stmt = db.prepare(sql);
   const bound = params.length ? stmt.bind(...params) : stmt;
   return bound.run();
 }
 
-export async function insert(db: D1Database, sql: string, ...params: Param[]): Promise<number> {
+export async function insert(db: Db, sql: string, ...params: Param[]): Promise<number> {
   const res = await run(db, sql, ...params);
-  return Number(res.meta.last_row_id ?? 0);
+  return Number(res.meta?.last_row_id ?? 0);
 }
 
-export async function scalar(db: D1Database, sql: string, ...params: Param[]): Promise<number> {
+export async function scalar(db: Db, sql: string, ...params: Param[]): Promise<number> {
   const row = await one<Record<string, number>>(db, sql, ...params);
   if (!row) return 0;
   const first = Object.values(row)[0];
   return Number(first ?? 0);
 }
 
-export async function getSettings(db: D1Database): Promise<Record<string, string>> {
+export async function getSettings(db: Db): Promise<Record<string, string>> {
   const rows = await all<{ key: string; value: string }>(db, 'SELECT key, value FROM settings');
   const out: Record<string, string> = {};
   for (const r of rows) out[r.key] = r.value;
   return out;
 }
 
-export async function setSetting(db: D1Database, key: string, value: string): Promise<void> {
+export async function setSetting(db: Db, key: string, value: string): Promise<void> {
   await run(
     db,
     'INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
@@ -70,7 +104,7 @@ export async function setSetting(db: D1Database, key: string, value: string): Pr
 }
 
 /** Recomputes invoice status from payments and due date. Never trusts a client claim of payment. */
-export async function refreshInvoice(db: D1Database, invoiceId: number): Promise<void> {
+export async function refreshInvoice(db: Db, invoiceId: number): Promise<void> {
   const inv = await one<{ id: number; total_cents: number; due_date: string | null; status: string }>(
     db,
     'SELECT id, total_cents, due_date, status FROM invoices WHERE id = ?',
@@ -101,7 +135,7 @@ export async function refreshInvoice(db: D1Database, invoiceId: number): Promise
   );
 }
 
-export async function recalcInvoiceTotals(db: D1Database, invoiceId: number): Promise<void> {
+export async function recalcInvoiceTotals(db: Db, invoiceId: number): Promise<void> {
   const items = await all<{ amount_cents: number }>(
     db,
     'SELECT amount_cents FROM invoice_items WHERE invoice_id = ?',
@@ -124,7 +158,7 @@ export async function recalcInvoiceTotals(db: D1Database, invoiceId: number): Pr
   await refreshInvoice(db, invoiceId);
 }
 
-export async function nextNumber(db: D1Database, prefix: string, table: 'invoices' | 'agreements'): Promise<string> {
+export async function nextNumber(db: Db, prefix: string, table: 'invoices' | 'agreements'): Promise<string> {
   const year = new Date().getUTCFullYear();
   const like = `${prefix}-${year}-%`;
   const n = await scalar(db, `SELECT COUNT(*) AS c FROM ${table} WHERE number LIKE ?`, like);
@@ -140,7 +174,7 @@ export async function nextNumber(db: D1Database, prefix: string, table: 'invoice
 }
 
 /** Mark overdue invoices. Safe to run repeatedly. */
-export async function sweepOverdueInvoices(db: D1Database): Promise<number> {
+export async function sweepOverdueInvoices(db: Db): Promise<number> {
   const iso = new Date().toISOString().slice(0, 10);
   const res = await run(
     db,
@@ -150,5 +184,5 @@ export async function sweepOverdueInvoices(db: D1Database): Promise<number> {
     new Date().toISOString(),
     iso,
   );
-  return res.meta.changes ?? 0;
+  return res.meta?.changes ?? 0;
 }

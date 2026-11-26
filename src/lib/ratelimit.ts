@@ -5,7 +5,7 @@
 // `rate_limits`, keyed by a caller-chosen string (for example
 // `portal:user:42`), and the upsert below is atomic.
 
-import { one, run } from './db';
+import { one, run, Db} from './db';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -17,7 +17,7 @@ export interface RateLimitResult {
 
 let tableReady: Promise<void> | null = null;
 
-async function ensureTable(db: D1Database): Promise<void> {
+async function ensureTable(db: Db): Promise<void> {
   tableReady ??= (async () => {
     await run(
       db,
@@ -42,7 +42,7 @@ async function ensureTable(db: D1Database): Promise<void> {
  * its budget. The counter resets when the fixed window rolls over.
  */
 export async function consumeRateLimit(
-  db: D1Database,
+  db: Db,
   key: string,
   limit: number,
   windowSeconds: number,

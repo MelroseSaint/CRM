@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "@cloudflare/workers-types"],
+    "lib": ["ES2022"],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "scripts/db-init-node.mts"
+  ],
+  "exclude": [
+    "web",
+    "web/dist",
+    "node_modules"
+  ]
+}

@@ -25,6 +25,8 @@
     "scripts/**/*.ts"
   ],
   "exclude": [
+    "src/node",
+    "src/vercel.ts",
     "web",
     "web/dist",
     "node_modules"
