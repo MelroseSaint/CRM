@@ -103,6 +103,10 @@ SQL is unchanged. Set these environment variables in the Vercel project:
 | --- | --- |
 | `DATABASE_URL` | `libsql://…` or `https://…` database URL |
 | `DATABASE_AUTH_TOKEN` | database token for that URL |
+
+The Turso names `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are accepted too, so the Turso
+integration in the Vercel Marketplace can be used without renaming anything. A `file:` URL is
+rejected on Vercel, where the filesystem is read-only.
 Apply the shared schema to the database once, then deploy:
 
 ```bash
@@ -128,8 +132,8 @@ returns `503 database_not_initialised` until the schema is applied (`npm run db:
 The app service deliberately exposes its configuration state instead of failing anonymously:
 
 - `GET /api/v1/health` returns `200` only when the function is running.
-- `503 server_not_configured` means `DATABASE_URL` is missing from the Vercel project; add it (and
-  `DATABASE_AUTH_TOKEN`) for Production **and** Preview, then redeploy.
+- `503 server_not_configured` means no database URL is visible to the function; add `DATABASE_URL`
+  (or `TURSO_DATABASE_URL`) and the matching token for Production **and** Preview, then redeploy.
 - `503 database_unavailable` means the configured database rejected the connection; check the token
   and that `npm run db:init:node` has been applied to that exact database.
 

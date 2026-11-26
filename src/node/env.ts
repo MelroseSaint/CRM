@@ -30,17 +30,26 @@ export function loadEnv(): Env {
   if (cached) return cached;
   loadDotEnv();
 
-  const configured = process.env.DATABASE_URL?.trim();
+  // Accept the names Turso's own CLI and dashboard use, so a copied connection
+  // string does not fail just because it was stored as TURSO_DATABASE_URL.
+  const configured = (process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL)?.trim();
+  const authToken = (process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN)?.trim() || undefined;
   // On Vercel a file: database cannot work (read-only filesystem, no persistence),
   // so stop with a clear configuration error instead of a generic 500.
   if (!configured && process.env.VERCEL) {
     throw new Error(
-      'DATABASE_URL is not configured. Set DATABASE_URL (and DATABASE_AUTH_TOKEN for Turso) ' +
-        'in the Vercel project environment, then redeploy.',
+      'DATABASE_URL is not configured. Set DATABASE_URL (or TURSO_DATABASE_URL) and ' +
+        'DATABASE_AUTH_TOKEN (or TURSO_AUTH_TOKEN) in the Vercel project environment for Production ' +
+        'and Preview, then redeploy.',
+    );
+  }
+  if (configured?.startsWith('file:') && process.env.VERCEL) {
+    throw new Error(
+      `DATABASE_URL is set to ${configured}, but Vercel functions have a read-only filesystem. ` +
+        'Use a libSQL URL (libsql:// or https://) with DATABASE_AUTH_TOKEN instead.',
     );
   }
   const url = configured || DEFAULT_DATABASE_URL;
-  const authToken = process.env.DATABASE_AUTH_TOKEN?.trim() || undefined;
   const db = createLibsqlDb(url, authToken);
 
   // The SPA is served by the `web` service on Vercel, so no disk assets here;
