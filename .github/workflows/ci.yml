@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Clean clone, build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install the Worker dependencies
+        run: npm ci
+
+      - name: Install the React app dependencies
+        run: npm run web:install
+
+      - name: Create the local database
+        run: npm run db:init
+
+      - name: Build the React app
+        run: npm run build
+
+      - name: Start the Worker
+        run: |
+          npx wrangler dev --port 3000 --ip 127.0.0.1 --local > /tmp/worker.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/app/api/session > /dev/null; then
+              echo "Worker ready after ${attempt} checks"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Worker did not become ready" >&2
+          tail -50 /tmp/worker.log >&2
+          exit 1
+
+      - name: Run the integration suite
+        run: npm run test:api
+
+      - name: Worker log on failure
+        if: failure()
+        run: tail -100 /tmp/worker.log

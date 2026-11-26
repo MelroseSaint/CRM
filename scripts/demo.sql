@@ -185,13 +185,27 @@ VALUES
  (2,'inbound','metadata','ok','Metadata synchronised (production)','{"technology":{"framework":"Astro 5"}}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
  (3,'inbound','health','fail','Certificate renewal overdue by 2 days','{"status":"fail","message":"TLS renewal failed"}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-9 day'));
 
--- Lets the sign-in screen show the demo accounts (local evaluation only).
 -- accounts -----------------------------------------------------------------
 -- Public demo credentials, created with the same PBKDF2 hashing the app uses.
--- Never load this dataset into a database that holds real data.
-INSERT OR IGNORE INTO users(email, name, role, client_id, password_hash, password_salt, iterations, status, created_at)
-VALUES
- ('admin@anvil.test', 'Demo Administrator', 'admin', NULL, 'Q-Y4of9Dg4G4lq5ElGoL9PNbmTdrLqmn9vgMSVNvSBQ', 'i-oWhYgtoH2MAwXhJzxZdg', 150000, 'active', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
- ('portal@anvil.test', 'Mara Ellison', 'client', (SELECT id FROM clients WHERE email = 'mara@meridiancoffee.example' ORDER BY id LIMIT 1), 'Wn291M3cNvvhBC_Mr3KwE0gvBYB8iLf5v6eEFTStYf0', 'X2JOvDjSAgXceUy0cBZJbw', 150000, 'active', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+-- They are inserted only when the database has no accounts at all, so running
+-- this file can never add a known-password administrator next to real users.
+INSERT INTO users(email, name, role, client_id, password_hash, password_salt, iterations, status, created_at)
+SELECT email, name, role, client_id, password_hash, password_salt, iterations, status, created_at
+FROM (
+  SELECT 'admin@anvil.test' AS email, 'Demo Administrator' AS name, 'admin' AS role, NULL AS client_id,
+         'Q-Y4of9Dg4G4lq5ElGoL9PNbmTdrLqmn9vgMSVNvSBQ' AS password_hash,
+         'i-oWhYgtoH2MAwXhJzxZdg' AS password_salt, 150000 AS iterations, 'active' AS status,
+         strftime('%Y-%m-%dT%H:%M:%fZ','now') AS created_at
+  UNION ALL
+  SELECT 'portal@anvil.test', 'Mara Ellison', 'client',
+         (SELECT id FROM clients WHERE email = 'mara@meridiancoffee.example' ORDER BY id LIMIT 1),
+         'Wn291M3cNvvhBC_Mr3KwE0gvBYB8iLf5v6eEFTStYf0', 'X2JOvDjSAgXceUy0cBZJbw',
+         150000, 'active', strftime('%Y-%m-%dT%H:%M:%fZ','now')
+)
+WHERE (SELECT COUNT(*) FROM users) = 0;
 
-INSERT OR REPLACE INTO settings(key, value) VALUES ('demo_mode', '1');
+-- Advertise the demo accounts on the sign-in screen only when they exist.
+INSERT OR REPLACE INTO settings(key, value)
+SELECT 'demo_mode', '1'
+WHERE EXISTS (SELECT 1 FROM users WHERE email = 'admin@anvil.test')
+  AND EXISTS (SELECT 1 FROM users WHERE email = 'portal@anvil.test');

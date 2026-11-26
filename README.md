@@ -81,7 +81,11 @@ websites, maintenance, tasks):
 npm run db:demo
 ```
 
-The demo file is SQL you can read and delete; the application does not depend on it.
+The demo file is SQL you can read and delete; the application does not depend on it. Run it against a
+freshly initialised database: its sample rows reference each other by id, so loading it twice
+duplicates data and can trip foreign keys. Its two public accounts are inserted only when the
+database still has no users, and the sign-in banner only appears when both exist, so loading it onto
+a database that already has accounts never adds a known-password administrator.
 
 ## Test it
 
@@ -92,7 +96,10 @@ npm run test:api         # drives the running app over HTTP
 The suite runs against `http://127.0.0.1:3000` (override with `TEST_BASE`, `TEST_EMAIL`,
 `TEST_PASSWORD`). On a database with no accounts it performs first-run setup itself using
 `TEST_EMAIL` and `TEST_PASSWORD` (defaults `admin@anvil.test` / `AnvilOps-2026!`), so
-`npm run db:init` alone is enough before a test run. It covers sign-in and CSRF rejection, client and project CRUD, milestone and
+`npm run db:init` alone is enough before a test run. That setup only happens when `TEST_BASE` is a
+loopback address, so a suite pointed at a deployed environment never creates an account there: it
+stops and asks you to run `/setup` or supply credentials. `TEST_BOOTSTRAP=1` opts in explicitly for
+a disposable remote database. It covers sign-in and CSRF rejection, client and project CRUD, milestone and
 deliverable storage, a real availability check with its measured source, invoice totals, the rule
 that a pending payment never settles an invoice, overpayment refusal, payment confirmation, portal
 isolation (including another client's invoice and an internal document), portal payment claims,
@@ -101,6 +108,10 @@ revoke, the audit log, the SPA shell and security headers. It creates its own re
 suffix and deletes them at the end, so it can be run repeatedly against the same database.
 
 `npm test` runs both type checks followed by the suite. `npm run sdk:typecheck` compiles the SDK.
+
+GitHub Actions repeats these steps on every push and pull request — checkout, `npm ci`, web install,
+`db:init`, build, start the Worker and run the suite — in `.github/workflows/ci.yml`, so a clean
+clone is verified continuously.
 
 ## How the pieces work
 

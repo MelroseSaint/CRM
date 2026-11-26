@@ -6,6 +6,22 @@ const BASE = process.env.TEST_BASE ?? 'http://127.0.0.1:3000';
 const ADMIN_EMAIL = process.env.TEST_EMAIL ?? 'admin@anvil.test';
 const ADMIN_PASSWORD = process.env.TEST_PASSWORD ?? 'AnvilOps-2026!';
 
+// First-run setup is only performed against a loopback server, so a test run
+// pointed at a deployed environment can never create a known-password admin.
+// TEST_BOOTSTRAP=1 overrides that for a disposable remote database, and
+// TEST_BOOTSTRAP=0 disables it even locally.
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const BOOTSTRAP_ALLOWED = (() => {
+  const flag = (process.env.TEST_BOOTSTRAP ?? '').toLowerCase();
+  if (flag === '1' || flag === 'true') return true;
+  if (flag === '0' || flag === 'false') return false;
+  try {
+    return LOOPBACK_HOSTS.has(new URL(BASE).hostname);
+  } catch {
+    return false;
+  }
+})();
+
 let passed = 0;
 const failures: string[] = [];
 
@@ -83,6 +99,15 @@ async function main(): Promise<void> {
   // with the configured credentials before signing in.
   const initial = await admin.call('/app/api/session');
   admin.csrf = initial.data?.csrf ?? '';
+  if (initial.data?.setup_needed && !BOOTSTRAP_ALLOWED) {
+    failures.push(
+      `${BASE} has no accounts and first-run setup is not allowed here. Create the administrator at /setup, ` +
+        'or set TEST_EMAIL and TEST_PASSWORD for an existing account. TEST_BOOTSTRAP=1 permits setup ' +
+        'against a disposable database.',
+    );
+    report();
+    return;
+  }
   if (initial.data?.setup_needed) {
     const setup = await admin.call('/app/api/setup', {
       body: {
