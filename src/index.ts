@@ -113,7 +113,14 @@ app.get('*', async (c) => {
   if (path.startsWith('/api/') || path.startsWith('/app/api/')) {
     return c.json({ error: { code: 'not_found', message: `No endpoint matches ${c.req.method} ${path}.` } }, 404);
   }
-  if (path.includes('.') && !path.endsWith('.html')) return c.text('Not found', 404);
+  if (path.includes('.') && !path.endsWith('.html')) {
+    // Built JS/CSS/images. Cloudflare's asset layer answers these before the
+    // Worker runs; Node has no such layer, so resolve them here and never fall
+    // back to the SPA shell for a missing asset.
+    const asset = c.env.ASSETS ? await c.env.ASSETS.fetch(new URL(path, c.req.url).toString()) : null;
+    if (!asset || !asset.ok) return c.text('Not found', 404);
+    return asset;
+  }
 
   const assets = c.env.ASSETS;
   if (!assets) {
