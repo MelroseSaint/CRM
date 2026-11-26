@@ -107,11 +107,13 @@ SQL is unchanged. Set these environment variables in the Vercel project:
 The Turso names `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are accepted too, so the Turso
 integration in the Vercel Marketplace can be used without renaming anything. A `file:` URL is
 rejected on Vercel, where the filesystem is read-only.
-Apply the shared schema to the database once, then deploy:
+Deploy. On the first request against an empty database the Node/Vercel runtime applies
+`src/db/schema.sql` itself (the statements are idempotent and the SQL is embedded in
+`src/db/schema-sql.ts` by `npm run db:embed-schema`, which the build runs). No shell step is needed.
+The explicit command remains available for seeding, resetting or running migrations deliberately:
 
 ```bash
 DATABASE_URL=libsql://… DATABASE_AUTH_TOKEN=… npm run db:init:node
-vercel deploy            # Services are in beta; inspect the build logs on the first deploy
 ```
 
 On Vercel, uploaded documents are stored in the `file_blobs` table (same key/value contract as R2,
@@ -124,10 +126,8 @@ DATABASE_URL=file:.data/anvil.db npm run dev:node   # http://localhost:3000
 ```
 
 There is no default login. An empty database is the correct first-run state: open `/setup` to
-create the administrator, then sign in with that account. If the deployed site shows the sign-in
-form with no setup link, the API is not reaching an initialised database — `GET /app/api/session`
-returns `503 database_not_initialised` until the schema is applied (`npm run db:init:node` against
-`DATABASE_URL`) and the project is redeployed with `DATABASE_URL` and `DATABASE_AUTH_TOKEN` set.
+create the administrator, then sign in with that account. `GET /app/api/session` reports
+`setup_needed: true` until that account exists.
 
 The app service deliberately exposes its configuration state instead of failing anonymously:
 
