@@ -5,6 +5,7 @@ import type { AppVars } from '../lib/auth';
 import { audit, hashPassword } from '../lib/auth';
 import type { Env } from '../lib/db';
 import { all, insert, one, run, scalar } from '../lib/db';
+import { ownedRow } from '../lib/portal-scope';
 import { nowIso, randomToken, today } from '../lib/util';
 import {
   boolField,
@@ -555,13 +556,15 @@ export function appPeopleRoutes() {
     const user = c.get('user');
     if (!user) return fail(401, 'Sign in to continue.');
     const id = Number(c.req.param('id'));
-    const doc = await one<{ r2_key: string; name: string; content_type: string | null; visibility: string; client_id: number | null }>(
-      c.env.DB, 'SELECT r2_key, name, content_type, visibility, client_id FROM documents WHERE id = ?', id,
-    );
+    const columns = 'r2_key, name, content_type, visibility, client_id';
+    const doc = user.role === 'client'
+      ? await ownedRow<{ r2_key: string; name: string; content_type: string | null; visibility: string; client_id: number | null }>(
+          c, 'documents', id, user.client_id ?? 0, { columns, where: "AND visibility = 'client'" },
+        )
+      : await one<{ r2_key: string; name: string; content_type: string | null; visibility: string; client_id: number | null }>(
+          c.env.DB, `SELECT ${columns} FROM documents WHERE id = ?`, id,
+        );
     if (!doc) return fail(404, 'Document not found.');
-    if (user.role === 'client') {
-      if (doc.visibility !== 'client' || doc.client_id !== user.client_id) return fail(404, 'Document not found.');
-    }
     const object = await c.env.FILES.get(doc.r2_key);
     if (!object) return fail(410, 'The stored file is no longer available.');
     return new Response(object.body, {

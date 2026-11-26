@@ -149,11 +149,12 @@ export function guardAdmin(c: AppContext): AuthUser | Response {
   return user;
 }
 
-export function guardClient(c: AppContext): AuthUser | Response {
+export function guardClient(c: AppContext): (AuthUser & { client_id: number }) | Response {
   const user = c.get('user');
   if (!user) return fail(401, 'Sign in to continue.');
   if (user.role !== 'client' || !user.client_id) return fail(403, 'Client portal access required.');
-  return user;
+  // The check above proves the client scope exists; narrow it for row-level helpers.
+  return user as AuthUser & { client_id: number };
 }
 
 /** Loads a record and verifies it belongs to the signed-in client (portal isolation). */

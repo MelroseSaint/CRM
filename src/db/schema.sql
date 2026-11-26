@@ -539,6 +539,12 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON webhook_deliveries(status, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_deliveries_endpoint ON webhook_deliveries(endpoint_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key          TEXT PRIMARY KEY,
+  window_start INTEGER NOT NULL,
+  count        INTEGER NOT NULL
+);
+
 INSERT OR IGNORE INTO settings(key, value) VALUES
   ('business_name', 'Anvil Web Studio'),
   ('business_email', ''),

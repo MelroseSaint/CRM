@@ -6,6 +6,7 @@ import type { AppVars } from '../lib/auth';
 import { csrfValid } from '../lib/auth';
 import type { Env } from '../lib/db';
 import { apiReferenceBody } from '../docs/api-reference';
+import { consumeRateLimit } from '../lib/ratelimit';
 import { fail, json } from './app-helpers';
 import { appAuthRoutes } from './app-auth';
 import { appPeopleRoutes } from './app-people';
@@ -35,6 +36,9 @@ function trustedOrigin(c: { req: { header: (n: string) => string | undefined; ur
   }
 }
 
+const PORTAL_WRITE_LIMIT = 30;
+const PORTAL_WRITE_WINDOW_SECONDS = 60 * 60;
+
 export function appApiRoutes() {
   const app = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -44,6 +48,29 @@ export function appApiRoutes() {
       const token = c.req.header('x-csrf-token') ?? '';
       if (!csrfValid(c, token)) {
         return fail(403, 'The request token is missing or expired. Reload the page and try again.');
+      }
+    }
+    await next();
+  });
+
+  // One client account cannot flood portal writes: 30 changes per hour, counted
+  // in D1 so the budget holds across isolates and deploys. Reads are unlimited.
+  app.use('/portal/*', async (c, next) => {
+    const user = c.get('user');
+    if (user?.role === 'client' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
+      const budget = await consumeRateLimit(
+        c.env.DB,
+        `portal:user:${user.id}`,
+        PORTAL_WRITE_LIMIT,
+        PORTAL_WRITE_WINDOW_SECONDS,
+      );
+      if (!budget.allowed) {
+        const response = fail(
+          429,
+          `Too many portal changes. Try again in ${Math.max(1, Math.ceil(budget.retryAfter / 60))} minute(s).`,
+        );
+        response.headers.set('retry-after', String(budget.retryAfter));
+        return response;
       }
     }
     await next();

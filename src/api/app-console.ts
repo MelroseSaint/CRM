@@ -5,6 +5,7 @@ import type { AppVars, AuthUser } from '../lib/auth';
 import { audit, clientIp, hashPassword } from '../lib/auth';
 import type { Env } from '../lib/db';
 import { all, getSettings, insert, one, run, scalar, setSetting } from '../lib/db';
+import { ownedRow, ownedRows, ownedUpdate, projectChildRows } from '../lib/portal-scope';
 import { addDays, nowIso, sha256Hex, today } from '../lib/util';
 import {
   fail, guardAdmin, guardClient, guardStaff, json, like, moneyField, nullable, pageParams, paged, readBody, str,
@@ -343,18 +344,28 @@ export function appConsoleRoutes() {
     if (user instanceof Response) return user;
     const id = Number(c.req.param('id'));
     // Only client-facing columns: internal notes, budget and payment plan stay staff-side.
-    const project = await one<Record<string, unknown>>(
-      c.env.DB,
-      `SELECT id, name, status, description, scope, category, start_date, due_date
-         FROM projects WHERE id=? AND client_id=? AND portal_visible=1`,
-      id, user.client_id,
-    );
+    const project = await ownedRow<Record<string, unknown>>(c, 'projects', id, user.client_id, {
+      columns: 'id, name, status, description, scope, category, start_date, due_date',
+      where: 'AND portal_visible = 1',
+    });
     if (!project) return fail(404, 'Project not found.');
     const [milestones, deliverables, invoices, activity] = await Promise.all([
-      all(c.env.DB, 'SELECT * FROM project_milestones WHERE project_id=? ORDER BY sort, id', id),
-      all(c.env.DB, 'SELECT * FROM project_deliverables WHERE project_id=? AND portal_visible=1 ORDER BY created_at', id),
-      all(c.env.DB, 'SELECT id, number, status, total_cents, paid_cents, due_date FROM invoices WHERE project_id=? AND portal_visible=1 AND status<>?', id, 'draft'),
-      all(c.env.DB, `SELECT id, subject, body, happened_at, type FROM activities WHERE project_id=? AND visibility='client' ORDER BY happened_at DESC LIMIT 20`, id),
+      projectChildRows<Record<string, unknown>>(c, 'project_milestones', id, user.client_id, {
+        orderBy: 'ORDER BY x.sort, x.id',
+      }),
+      projectChildRows<Record<string, unknown>>(c, 'project_deliverables', id, user.client_id, {
+        where: 'AND x.portal_visible = 1',
+        orderBy: 'ORDER BY x.created_at',
+      }),
+      projectChildRows<Record<string, unknown>>(c, 'invoices', id, user.client_id, {
+        columns: 'id, number, status, total_cents, paid_cents, due_date',
+        where: "AND x.portal_visible = 1 AND x.status <> 'draft'",
+        orderBy: 'ORDER BY x.created_at DESC',
+      }),
+      projectChildRows<Record<string, unknown>>(c, 'activities', id, user.client_id, {
+        where: "AND x.visibility = 'client'",
+        orderBy: 'ORDER BY x.happened_at DESC LIMIT 20',
+      }),
     ]);
     return json({ project, milestones, deliverables, invoices, activities: activity });
   });
@@ -368,7 +379,10 @@ export function appConsoleRoutes() {
     // A client may only attach one of its own websites (never another client's id).
     const websiteId = Number(body.website_id) || null;
     if (websiteId) {
-      const owned = await one(c.env.DB, 'SELECT id FROM websites WHERE id=? AND client_id=?', websiteId, user.client_id);
+      const owned = await ownedRow(c, 'websites', websiteId, user.client_id, {
+        columns: 'id',
+        where: 'AND portal_visible = 1',
+      });
       if (!owned) return fail(422, 'Choose one of your websites.', { website_id: 'Not available.' });
     }
     const priorityInput = str(body, 'priority', 20);
@@ -389,10 +403,9 @@ export function appConsoleRoutes() {
     const user = guardClient(c);
     if (user instanceof Response) return user;
     const id = Number(c.req.param('id'));
-    const invoice = await one<{ id: number; total_cents: number; paid_cents: number; status: string }>(
-      c.env.DB,
-      'SELECT id, total_cents, paid_cents, status FROM invoices WHERE id=? AND client_id=? AND portal_visible=1',
-      id, user.client_id,
+    const invoice = await ownedRow<{ id: number; total_cents: number; paid_cents: number; status: string }>(
+      c, 'invoices', id, user.client_id,
+      { columns: 'id, total_cents, paid_cents, status', where: 'AND portal_visible = 1' },
     );
     if (!invoice) return fail(404, 'Invoice not found.');
     if (invoice.status === 'paid' || invoice.status === 'cancelled') return fail(409, 'This invoice is already settled.');
@@ -417,14 +430,17 @@ export function appConsoleRoutes() {
     const user = guardClient(c);
     if (user instanceof Response) return user;
     const id = Number(c.req.param('id'));
-    const ag = await one<{ status: string }>(
-      c.env.DB,
-      'SELECT status FROM agreements WHERE id=? AND client_id=? AND portal_visible=1',
-      id, user.client_id,
-    );
+    const ag = await ownedRow<{ status: string }>(c, 'agreements', id, user.client_id, {
+      columns: 'status',
+      where: 'AND portal_visible = 1',
+    });
     if (!ag) return fail(404, 'Agreement not found.');
     if (ag.status === 'sent') {
-      await run(c.env.DB, `UPDATE agreements SET status='viewed', viewed_at=?, updated_at=? WHERE id=?`, nowIso(), nowIso(), id);
+      await ownedUpdate(c, 'agreements', id, user.client_id, {
+        status: 'viewed',
+        viewed_at: nowIso(),
+        updated_at: nowIso(),
+      });
     }
     return json({ ok: true });
   });
@@ -433,11 +449,9 @@ export function appConsoleRoutes() {
     const user = guardClient(c);
     if (user instanceof Response) return user;
     const id = Number(c.req.param('id'));
-    const agreement = await one<Record<string, unknown>>(
-      c.env.DB,
-      'SELECT * FROM agreements WHERE id=? AND client_id=? AND portal_visible=1',
-      id, user.client_id,
-    );
+    const agreement = await ownedRow<Record<string, unknown>>(c, 'agreements', id, user.client_id, {
+      where: 'AND portal_visible = 1',
+    });
     if (!agreement) return fail(404, 'Agreement not found.');
     if (agreement.accepted_at) return fail(409, 'This agreement has already been accepted.');
     if (!['sent', 'viewed'].includes(String(agreement.status))) return fail(409, 'This agreement is not open for acceptance.');
@@ -458,11 +472,14 @@ export function appConsoleRoutes() {
       agreement.extra_conditions,
     ].join('\u001f');
     const hash = await sha256Hex(content);
-    await run(
-      c.env.DB,
-      `UPDATE agreements SET status='accepted', accepted_at=?, accepted_by=?, accepted_ip=?, accepted_hash=?, updated_at=? WHERE id=?`,
-      nowIso(), name, clientIp(c), hash, nowIso(), id,
-    );
+    await ownedUpdate(c, 'agreements', id, user.client_id, {
+      status: 'accepted',
+      accepted_at: nowIso(),
+      accepted_by: name,
+      accepted_ip: clientIp(c),
+      accepted_hash: hash,
+      updated_at: nowIso(),
+    });
     await audit(c, 'agreement.accepted', 'agreement', id, { accepted_by: name, hash });
     return json({ ok: true, hash });
   });
@@ -484,7 +501,11 @@ export function appConsoleRoutes() {
   app.get('/portal/lookups', async (c) => {
     const user = guardClient(c);
     if (user instanceof Response) return user;
-    const websites = await all(c.env.DB, 'SELECT id, name FROM websites WHERE client_id=? AND portal_visible=1 ORDER BY name', user.client_id);
+    const websites = await ownedRows(c, 'websites', user.client_id, {
+      columns: 'id, name',
+      where: 'AND portal_visible = 1',
+      orderBy: 'ORDER BY name',
+    });
     return json({ websites });
   });
 

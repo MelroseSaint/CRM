@@ -56,7 +56,7 @@ class Session {
     } catch {
       data = { raw: text.slice(0, 200) };
     }
-    return { status: res.status, data, setCookies };
+    return { status: res.status, data, setCookies, headers: Object.fromEntries(res.headers.entries()) };
   }
 
   async open(): Promise<void> {
@@ -209,6 +209,19 @@ async function main(): Promise<void> {
   });
   await admin.call(`/app/api/invoices/${otherInvoice.data.id}/send`, { body: {} });
 
+  const otherProject = await admin.call('/app/api/projects', {
+    body: { name: `Other Project ${suffix}`, client_id: Number(otherClient.data.id), category: 'business_website' },
+  });
+  const otherAgreement = await admin.call('/app/api/agreements', {
+    body: { client_id: Number(otherClient.data.id), title: `Other Agreement ${suffix}`, amount: '500' },
+  });
+  await admin.call(`/app/api/agreements/${otherAgreement.data.id}/send`, { body: {} });
+  const otherDocForm = new FormData();
+  otherDocForm.set('file', new Blob(['other client secret'], { type: 'text/plain' }), 'other.txt');
+  otherDocForm.set('client_id', String(Number(otherClient.data.id)));
+  otherDocForm.set('visibility', 'client');
+  const otherDoc = await admin.call('/app/api/documents', { form: otherDocForm });
+
   const portal = new Session();
   const portalLogin = await portal.login(portalEmail, portalPassword);
   check('client can sign in to the portal', portalLogin.status === 200 && portalLogin.data?.user?.role === 'client', portalLogin);
@@ -247,6 +260,28 @@ async function main(): Promise<void> {
       !('notes' in portalProjectRow) &&
       !('payment_structure' in portalProjectRow),
     Object.keys(portalProjectRow),
+  );
+
+  // ---------------------------------------------------------------- row-level scoping
+  const foreignProject = await portal.call(`/app/api/portal/projects/${otherProject.data.id}`);
+  check("portal cannot open another client's project", foreignProject.status === 404, foreignProject.status);
+
+  const foreignAgreementView = await portal.call(`/app/api/portal/agreements/${otherAgreement.data.id}/view`, { body: {} });
+  check("portal cannot open another client's agreement", foreignAgreementView.status === 404, foreignAgreementView.status);
+
+  const foreignAgreementAccept = await portal.call(`/app/api/portal/agreements/${otherAgreement.data.id}/accept`, {
+    body: { name: 'Mallory', consent: true },
+  });
+  check("portal cannot accept another client's agreement", foreignAgreementAccept.status === 404, foreignAgreementAccept.status);
+
+  const foreignDocument = await portal.call(`/app/api/documents/${otherDoc.data.id}/download`);
+  check("portal cannot download another client's document", foreignDocument.status === 404, foreignDocument.status);
+
+  const refreshedHome = await portal.call('/app/api/portal');
+  check(
+    'portal overview lists no records from another client',
+    !(refreshedHome.data?.projects ?? []).some((row: any) => row.id === Number(otherProject.data.id)) &&
+      !(refreshedHome.data?.agreements ?? []).some((row: any) => row.id === Number(otherAgreement.data.id)),
   );
 
   const sessionCookie = admin.loginSetCookies.find((value) => value.startsWith('anvil_session='));
@@ -321,6 +356,45 @@ async function main(): Promise<void> {
   check('acceptance stores the signer name', accepted.data?.agreement?.accepted_by === 'Portal Tester');
   check('acceptance stores a content hash', /^[0-9a-f]{64}$/.test(String(accepted.data?.agreement?.accepted_hash)), accepted.data?.agreement?.accepted_hash);
   check('acceptance stores the client IP', Boolean(accepted.data?.agreement?.accepted_ip));
+
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const expiredAgreement = await admin.call('/app/api/agreements', {
+    body: { client_id: clientId, title: `Expired Terms ${suffix}`, amount: '900', expires_at: yesterday },
+  });
+  await admin.call(`/app/api/agreements/${expiredAgreement.data.id}/send`, { body: {} });
+  const expiredAccept = await portal.call(`/app/api/portal/agreements/${expiredAgreement.data.id}/accept`, {
+    body: { name: 'Portal Tester', consent: true },
+  });
+  check(
+    'expired agreements cannot be accepted',
+    expiredAccept.status === 409 && /expired/i.test(String(expiredAccept.data?.error?.message ?? '')),
+    expiredAccept,
+  );
+  const expiredDetail = await admin.call(`/app/api/agreements/${expiredAgreement.data.id}`);
+  check('expired agreement stays unaccepted', !expiredDetail.data?.agreement?.accepted_at, expiredDetail.data?.agreement?.status);
+
+  // ---------------------------------------------------------------- portal write budget
+  const spamClient = await admin.call('/app/api/clients', {
+    body: { name: `Rate limit ${suffix}`, status: 'active_client' },
+  });
+  const spamEmail = `spam-${suffix}@example.test`;
+  await admin.call(`/app/api/clients/${spamClient.data.id}/portal`, {
+    body: { email: spamEmail, password: portalPassword },
+  });
+  const spam = new Session();
+  const spamLogin = await spam.login(spamEmail, portalPassword);
+  check('a second client account can sign in', spamLogin.status === 200, spamLogin.status);
+
+  let limited: Awaited<ReturnType<Session['call']>> | null = null;
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    limited = await spam.call('/app/api/portal/requests', { body: {} });
+    if (limited.status === 429) break;
+  }
+  check('portal writes are rate limited per account', limited?.status === 429, limited?.status);
+  check('rate limit response carries Retry-After', Number(limited?.headers?.['retry-after'] ?? 0) > 0, limited?.headers);
+  const unaffected = await portal.call(`/app/api/portal/agreements/${agreement.data.id}/view`, { body: {} });
+  check('rate limiting does not leak across accounts', unaffected.status === 200, unaffected.status);
+  await admin.call(`/app/api/clients/${spamClient.data.id}`, { method: 'DELETE' });
 
   // ---------------------------------------------------------------- integration API
   const credential = await admin.call(`/app/api/websites/${siteId}/credentials`, {

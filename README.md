@@ -114,11 +114,21 @@ state (`reported`). Reported values never overwrite measured ones; both are show
 **Monitoring** runs from the Worker's cron trigger (`*/15 * * * *`): due website checks, webhook
 retries and the overdue-invoice sweep. Manual checks are available from the website screen.
 
-**Security**: PBKDF2-SHA256 (150k iterations) password hashes, hashed session IDs in an HttpOnly
-SameSite=Lax cookie, a per-session CSRF token required on every mutating JSON request, login throttling after repeated
-failures, staff/client route guards, client-scoped portal queries, audit log, security headers and
-a strict CSP. Secrets belong in Worker secrets or per-website environment variables — never in
-notes, the database, or client-side code.
+**Security**: PBKDF2-SHA256 (150k iterations) password hashes, hashed session IDs in HttpOnly cookies
+(`SameSite=None; Secure` over HTTPS so the app also works inside an embedded preview frame, `Lax`
+over plain HTTP), a per-session CSRF token plus a `Sec-Fetch-Site`/Origin check on every mutating
+request, login throttling after repeated failures, staff/client route guards, row-level portal
+scoping, audit log, security headers and a strict CSP. Secrets belong in Worker secrets or
+per-website environment variables — never in notes, the database, or client-side code.
+
+**Client portal access** is enforced per row, not per route. D1 has no row-level security, so
+`src/lib/portal-scope.ts` is the single door to client-owned tables: it always binds the signed-in
+`client_id`, refuses any table outside a fixed allowlist, and loads project milestones,
+deliverables, invoices and activity by joining the parent project. A portal request therefore cannot
+read or write another client's record even if an endpoint forgets a predicate. Portal writes are
+also budgeted at **30 changes per hour per client account** (`src/lib/ratelimit.ts`, counted in D1 so
+the limit holds across isolates); reads are not limited, and the over-limit response includes
+`Retry-After`.
 
 ## Integration API
 

@@ -270,6 +270,7 @@ export function SettingsPage() {
             ['Sessions', 'Hashed IDs, HttpOnly, 12h, SameSite=None on HTTPS'],
             ['CSRF', 'Per-session token, required on writes'],
             ['Request origin', 'Cross-site writes rejected (Sec-Fetch-Site)'],
+            ['Portal write budget', '30 changes per hour per client account'],
             ['Login throttling', '8 failures per 15 minutes'],
             ['Roles', 'Administrator, Staff, Client'],
             ['Portal isolation', 'Server-side client scope on every query'],
