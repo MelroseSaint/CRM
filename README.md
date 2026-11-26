@@ -94,7 +94,7 @@ The API is not tied to Cloudflare. `src/vercel.ts` serves the same Hono applicat
 function, and `src/node/` supplies the pieces Cloudflare used to provide: the database, document
 storage and the scheduled jobs. `vercel.json` declares two Vercel Services — `app` (this repo,
 framework `hono`, entrypoint `src/vercel.ts`) for `/app/api` and `/api`, and `web` (`web/`, Vite) for
-the built SPA — and a cron job that calls `/api/cron` every 15 minutes.
+the built SPA.
 
 Use a libSQL database (Turso) rather than Postgres: the schema and every query are SQLite, so the
 SQL is unchanged. Set these environment variables in the Vercel project:
@@ -104,7 +104,6 @@ SQL is unchanged. Set these environment variables in the Vercel project:
 | `DATABASE_URL` | `libsql://…` or `https://…` database URL |
 | `DATABASE_AUTH_TOKEN` | database token for that URL |
 | `CRON_SECRET` | shared secret; `/api/cron` rejects requests without `Authorization: Bearer <secret>` |
-
 Apply the shared schema to the database once, then deploy:
 
 ```bash
@@ -122,10 +121,13 @@ DATABASE_URL=file:.data/anvil.db npm run dev:node   # http://localhost:3000
 ```
 
 Without `CRON_SECRET` the cron route refuses to run when `VERCEL` is set, so a deployment never runs
-scheduled work unauthenticated; local Node allows it for convenience. Vercel Hobby plans only allow
-daily cron schedules — change `crons` in `vercel.json` if the project is on Hobby. The Cloudflare
-Worker remains the default deployment: `wrangler.jsonc`, D1, R2 and the `scheduled` handler are
-untouched.
+scheduled work unauthenticated; local Node allows it for convenience. `vercel.json` does **not**
+configure a Vercel Cron Job: Hobby accounts only allow a daily schedule, which is why the route is
+left to an external scheduler instead. If you need the 15-minute sweep on Vercel, point a scheduler
+at `GET /api/cron` with `Authorization: Bearer <CRON_SECRET>` (or upgrade the plan and add the
+`crons` entry back). Until then, website checks, webhook retries and the overdue sweep run only on
+the Cloudflare Worker or when that endpoint is called. The Cloudflare Worker remains the default
+deployment: `wrangler.jsonc`, D1, R2 and the `scheduled` handler are untouched.
 
 ## Test it
 
@@ -169,9 +171,9 @@ not a qualified e-signature, and manually recorded acceptances are labelled as e
 state (`reported`). Reported values never overwrite measured ones; both are shown side by side.
 
 **Monitoring** runs from the Worker's cron trigger (`*/15 * * * *`): due website checks, webhook
-retries and the overdue-invoice sweep. On Vercel the same jobs run from `/api/cron`, called by the
-cron entry in `vercel.json` and guarded by `CRON_SECRET`. Manual checks are available from the
-website screen.
+retries and the overdue-invoice sweep. On Vercel no Cron Job is configured (Hobby allows only
+daily schedules); the same jobs run only when `/api/cron` is called by an external scheduler with
+`CRON_SECRET`. Manual checks are available from the website screen.
 
 **Security**: PBKDF2-SHA256 (150k iterations) password hashes, hashed session IDs in HttpOnly cookies
 (`SameSite=None; Secure` over HTTPS so the app also works inside an embedded preview frame, `Lax`
