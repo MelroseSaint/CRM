@@ -197,17 +197,13 @@ Run `/setup` on the deployed origin to create the administrator account. Put any
 
 The remote is `https://github.com/MelroseSaint/CRM.git`.
 
-**From a chat, nothing needs to be configured.** The GitHub account connected to this project is the
-credential: ask the agent to push and it publishes the branch through that connection, creating a
-short-lived, repository-scoped deploy key for the duration of the push and deleting it afterwards.
-No personal access token, project secret or SSH key is required.
+Pushes go through the GitHub account connected to this project. Ask the agent to push and it
+publishes the branch over that connection, using a short-lived, repository-scoped deploy key that is
+deleted as soon as the push completes. No personal access token, project secret or SSH key is
+required, and no credential is stored in the workspace or in the repository.
 
-**From a shell**, `npm run push` works if a token is available. It reads `GITHUB_TOKEN` and passes it
-to git through `scripts/git-askpass.sh` (`GIT_ASKPASS`), so the token is never written to disk, a
-config file or shell history, and the script refuses to run when `origin` is not the URL above. The
-token is optional: it is only useful for unattended pushes, and can be a fine-grained token for
-`MelroseSaint/CRM` with **Contents: Read and write** stored as the project secret `GITHUB_TOKEN`.
-Delete the token on GitHub to revoke it; nothing else is cached.
+The sandbox itself has no saved git credential, so a bare `git push` from a shell will ask for
+authentication; use the chat instead.
 
 ## Scope and honest limits
 
