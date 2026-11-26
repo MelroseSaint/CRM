@@ -20,7 +20,7 @@ src/
                       agreements & invoices, dashboard/reports/settings/API ops/portal
   api/v1.ts           integration API for client websites (registration, sync, events, health)
   docs/api-reference.ts  reference rendered into the in-app API docs screen
-  ui/styles.ts        design-system stylesheet served at /assets/app.css
+  ui/styles.ts        design-system stylesheet, bundled into the SPA
 web/
   src/main.tsx        router and entry
   src/shell.tsx       staff workspace shell and client-portal shell
@@ -124,7 +124,18 @@ create the administrator, then sign in with that account. If the deployed site s
 form with no setup link, the API is not reaching an initialised database — `GET /app/api/session`
 returns `503 database_not_initialised` until the schema is applied (`npm run db:init:node` against
 `DATABASE_URL`) and the project is redeployed with `DATABASE_URL` and `DATABASE_AUTH_TOKEN` set.
-Client portal accounts are not self-service: staff create them from the client record.
+
+The app service deliberately exposes its configuration state instead of failing anonymously:
+
+- `GET /api/v1/health` returns `200` only when the function is running.
+- `503 server_not_configured` means `DATABASE_URL` is missing from the Vercel project; add it (and
+  `DATABASE_AUTH_TOKEN`) for Production **and** Preview, then redeploy.
+- `503 database_unavailable` means the configured database rejected the connection; check the token
+  and that `npm run db:init:node` has been applied to that exact database.
+
+`src/vercel.ts` exports a Hono instance, which is what Vercel's Hono integration invokes; a plain
+fetch-function default export fails before the function (and its logs) ever run. Client portal
+accounts are not self-service: staff create them from the client record.
 
 Vercel runs no scheduled work here. Cron Jobs on Hobby accounts are limited to daily schedules, so
 `vercel.json` declares none and the Node runtime exposes no scheduler endpoint: website checks,

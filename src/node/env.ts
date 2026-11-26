@@ -30,7 +30,16 @@ export function loadEnv(): Env {
   if (cached) return cached;
   loadDotEnv();
 
-  const url = process.env.DATABASE_URL?.trim() || DEFAULT_DATABASE_URL;
+  const configured = process.env.DATABASE_URL?.trim();
+  // On Vercel a file: database cannot work (read-only filesystem, no persistence),
+  // so stop with a clear configuration error instead of a generic 500.
+  if (!configured && process.env.VERCEL) {
+    throw new Error(
+      'DATABASE_URL is not configured. Set DATABASE_URL (and DATABASE_AUTH_TOKEN for Turso) ' +
+        'in the Vercel project environment, then redeploy.',
+    );
+  }
+  const url = configured || DEFAULT_DATABASE_URL;
   const authToken = process.env.DATABASE_AUTH_TOKEN?.trim() || undefined;
   const db = createLibsqlDb(url, authToken);
 
