@@ -12,22 +12,24 @@
   overflow: auto;
 }
 .modal {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--ink);
+  border-radius: 0;
   width: 100%;
   max-width: 580px;
-  box-shadow: 0 26px 64px -24px rgba(15, 18, 22, .55);
 }
 .modal.wide { max-width: 780px; }
 .modal-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
+  padding: 13px 18px;
+  border-bottom: 2px solid var(--ink);
 }
-.modal-head h2 { font-size: 15px; font-weight: 600; }
+.modal-head h2 {
+  font-family: var(--display); font-size: 14px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .02em;
+}
 .modal-x {
   margin-left: auto;
   background: none;
@@ -47,17 +49,18 @@
   gap: 8px;
   padding: 12px 18px;
   border-top: 1px solid var(--line);
-  background: #fbfaf7;
-  border-radius: 0 0 10px 10px;
+  background: transparent;
 }
 
 .toasts { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 120; }
 .toast {
   padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  max-width: 360px;
-  box-shadow: 0 12px 30px -14px rgba(15, 18, 22, .6);
+  border-radius: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  max-width: 380px;
+  border: 1px solid var(--ink);
 }
 .toast.ok { background: var(--accent); color: #fff; }
 .toast.err { background: var(--danger); color: #fff; }
@@ -94,9 +97,9 @@ button.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-
   align-items: baseline;
   gap: 10px;
   padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--panel);
   margin-bottom: 6px;
 }
 .search-hit:hover { border-color: var(--line-strong); text-decoration: none; }
@@ -157,9 +160,9 @@ button.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-
   width: 36px;
   height: 36px;
   flex: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--panel);
   color: var(--ink);
   cursor: pointer;
 }
@@ -233,9 +236,9 @@ button.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-
 /* demo workspace hint on the sign-in screen */
 .demo-logins {
   margin-top: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfaf6;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: transparent;
   padding: 11px;
   display: grid;
   gap: 7px;

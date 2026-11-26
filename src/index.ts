@@ -8,7 +8,6 @@ import type { Env } from './lib/db';
 import { getSettings, sweepOverdueInvoices } from './lib/db';
 import { navCounts } from './lib/http';
 import { randomToken } from './lib/util';
-import { CSS } from './ui/styles';
 import { apiV1Routes } from './api/v1';
 import { appApiRoutes } from './api/app';
 import { processPendingDeliveries } from './lib/webhooks';
@@ -28,15 +27,7 @@ function securityHeaders(c: { req: { url: string } }, res: Response): void {
 }
 
 // ---------------------------------------------------------------- static assets
-app.get('/assets/app.css', (c) =>
-  c.body(CSS, 200, {
-    'content-type': 'text/css; charset=utf-8',
-    'cache-control': 'public, max-age=600',
-    'x-content-type-options': 'nosniff',
-  }),
-);
-
-app.get('/favicon.ico', (c) => c.redirect('/assets/favicon.svg', 302));
+app.get('/favicon.ico', (c) => c.redirect('/favicon.svg', 302));
 app.get('/assets/favicon.svg', (c) =>
   c.body(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0f5c4a"/><path d="M9 23 16 8l7 15" stroke="#fff" stroke-width="2.2" fill="none" stroke-linejoin="round"/><path d="M12.5 18h7" stroke="#fff" stroke-width="2.2"/></svg>`,

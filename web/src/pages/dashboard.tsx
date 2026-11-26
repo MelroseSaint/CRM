@@ -58,7 +58,7 @@ export function Dashboard() {
         <div className="stack" style={{ gap: 16 }}>
           <Panel
             title="Invoiced against collected"
-            right={<span className="legend"><span><i style={{ background: '#cddfd8' }} />Invoiced</span><span><i style={{ background: 'var(--accent)' }} />Collected</span></span>}
+            right={<span className="legend"><span><i style={{ background: 'var(--line-strong)' }} />Invoiced</span><span><i style={{ background: 'var(--accent)' }} />Collected</span></span>}
             foot="Collected counts confirmed payments by paid date; invoiced counts issued invoices by issue date."
           >
             <div className="rev-chart">
