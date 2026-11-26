@@ -119,6 +119,13 @@ DATABASE_URL=file:.data/anvil.db npm run db:init:node
 DATABASE_URL=file:.data/anvil.db npm run dev:node   # http://localhost:3000
 ```
 
+There is no default login. An empty database is the correct first-run state: open `/setup` to
+create the administrator, then sign in with that account. If the deployed site shows the sign-in
+form with no setup link, the API is not reaching an initialised database — `GET /app/api/session`
+returns `503 database_not_initialised` until the schema is applied (`npm run db:init:node` against
+`DATABASE_URL`) and the project is redeployed with `DATABASE_URL` and `DATABASE_AUTH_TOKEN` set.
+Client portal accounts are not self-service: staff create them from the client record.
+
 Vercel runs no scheduled work here. Cron Jobs on Hobby accounts are limited to daily schedules, so
 `vercel.json` declares none and the Node runtime exposes no scheduler endpoint: website checks,
 webhook retries and the overdue-invoice sweep remain a Cloudflare Worker feature (its `scheduled`

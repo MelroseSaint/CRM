@@ -35,7 +35,7 @@ function AuthSide() {
 }
 
 export function Login() {
-  const { refresh, session } = useSession();
+  const { refresh, session, error: sessionError } = useSession();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,7 +67,11 @@ export function Login() {
         <form className="auth-form" onSubmit={submit}>
           <h1>Sign in</h1>
           <div className="auth-sub">Use the account issued for your studio or client portal.</div>
-          {error ? <div className="flash err">{error}</div> : null}
+          {error ? (
+            <div className="flash err">{error}</div>
+          ) : sessionError ? (
+            <div className="flash err">{sessionError}</div>
+          ) : null}
           <div className="field">
             <label className="lbl" htmlFor="email">Email</label>
             <input
@@ -123,7 +127,13 @@ export function Login() {
             </div>
           ) : null}
           <div className="auth-foot">
-            {session?.setup_needed ? <>First run? <Link to="/setup">Create the administrator account</Link>.</> : 'Sessions expire after 12 hours.'}
+            {session?.setup_needed !== false ? (
+              <>
+                First run or no account yet? <Link to="/setup">Create the administrator account</Link>.
+              </>
+            ) : (
+              'Sessions expire after 12 hours.'
+            )}
           </div>
         </form>
       </div>

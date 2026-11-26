@@ -1,6 +1,6 @@
 // Anvil Ops — Worker entry point: JSON app API, integration API, SPA assets, scheduled jobs.
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AppVars } from './lib/auth';
 import { clientIp, loadSession, serializeCsrfCookie } from './lib/auth';
@@ -45,10 +45,48 @@ app.get('/assets/favicon.svg', (c) =>
   ),
 );
 
+// An empty database is the correct first-run state, but a database that was
+// never initialised must say so instead of failing as an opaque 500 behind the
+// sign-in form.
+function isMissingSchema(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /no such table|no such column|unable to open database|SQLITE_(ERROR|CANTOPEN)|D1_ERROR/i.test(message);
+}
+
+function databaseNotInitialised(c: Context): Response {
+  const message =
+    'The database has not been initialised. Apply src/db/schema.sql — npm run db:init for the ' +
+    'Cloudflare Worker, or npm run db:init:node for Node/Vercel — then reload this page.';
+  const path = new URL(c.req.url).pathname;
+  if (path.startsWith('/api/') || path.startsWith('/app/api/')) {
+    return c.json({ error: { code: 'database_not_initialised', message } }, 503);
+  }
+  return c.html(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Anvil Ops — database not initialised</title>
+     <style>body{font:15px/1.6 ui-sans-serif,system-ui;margin:0;background:#f4f2ed;color:#16181b}
+     main{max-width:620px;margin:80px auto;padding:0 24px}h1{font-family:Georgia,serif;font-size:24px}
+     code{background:#fff;border:1px solid #e3e0d8;border-radius:4px;padding:2px 5px}</style></head>
+     <body><main><h1>The database has not been initialised</h1>
+     <p>Apply the schema, then create the first administrator at <code>/setup</code>:</p>
+     <p><code>npm run db:init</code> for the Cloudflare Worker, or
+     <code>npm run db:init:node</code> for Node/Vercel.</p>
+     <p>${message}</p></main></body></html>`,
+    503,
+  );
+}
+
 // ---------------------------------------------------------------- request context
 app.use('*', async (c, next) => {
   c.set('ip', clientIp(c));
-  const session = await loadSession(c);
+  let session: Awaited<ReturnType<typeof loadSession>>;
+  let settings: Record<string, string>;
+  try {
+    session = await loadSession(c);
+    settings = await getSettings(c.env.DB);
+  } catch (err) {
+    if (isMissingSchema(err)) return databaseNotInitialised(c);
+    throw err;
+  }
   c.set('user', session.user);
   c.set('sessionId', session.sessionId);
 
@@ -58,7 +96,7 @@ app.use('*', async (c, next) => {
     if (!csrf) csrf = randomToken(24);
   }
   c.set('csrf', csrf);
-  c.set('settings', await getSettings(c.env.DB));
+  c.set('settings', settings);
   c.set('navCounts', {});
   c.set('cookies', []);
   if (!session.csrf && !getCookie(c, 'anvil_csrf')) {
