@@ -334,6 +334,7 @@ export function CalendarPage() {
       </div>
       {error ? <Alert>{error}</Alert> : null}
       {loading ? <Loading /> : (
+        <div className="cal-scroll">
         <div className="cal-grid">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dow) => <div className="cal-dow" key={dow}>{dow}</div>)}
           {grid.map((cell) => {
@@ -345,7 +346,9 @@ export function CalendarPage() {
                 onDoubleClick={() => setCreating(cell.date)}
               >
                 <div className="cal-day">
-                  <span>{cell.day}</span>
+                  <button className="cal-day-btn" onClick={() => setCreating(cell.date)} aria-label={`Add an event on ${cell.date}`}>
+                    {cell.day}
+                  </button>
                   {dayEvents.length ? <span className="n">{dayEvents.length}</span> : null}
                 </div>
                 {dayEvents.slice(0, 3).map((event) => (
@@ -362,8 +365,9 @@ export function CalendarPage() {
             );
           })}
         </div>
+        </div>
       )}
-      <div className="hint mt-2">Double-click a day to add an event.</div>
+      <div className="hint mt-2">Tap a day number to add an event.</div>
 
       {creating ? (
         <FormModal

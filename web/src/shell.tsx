@@ -1,16 +1,35 @@
 // Application shells: staff workspace and client portal.
 
-import { useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSession, type User } from './session';
 import { Icon, Toasts, Badge } from './ui';
-import { Dashboard } from './pages/dashboard';
-import { Clients, ClientDetail, Pipeline } from './pages/people';
-import { Projects, ProjectDetail, Websites, WebsiteDetail } from './pages/work';
-import { Agreements, AgreementDetail, Invoices, InvoiceDetail } from './pages/money';
-import { Maintenance, Tasks, CalendarPage, Documents } from './pages/ops';
-import { Reports, SearchPage, SettingsPage, ApiConsole, ApiDocs, ActivityPage, NotFound } from './pages/system';
-import { PortalHome, PortalProject } from './pages/portal';
+
+const Dashboard = lazy(() => import('./pages/dashboard').then((m) => ({ default: m.Dashboard })));
+const Clients = lazy(() => import('./pages/people').then((m) => ({ default: m.Clients })));
+const ClientDetail = lazy(() => import('./pages/people').then((m) => ({ default: m.ClientDetail })));
+const Pipeline = lazy(() => import('./pages/people').then((m) => ({ default: m.Pipeline })));
+const Projects = lazy(() => import('./pages/work').then((m) => ({ default: m.Projects })));
+const ProjectDetail = lazy(() => import('./pages/work').then((m) => ({ default: m.ProjectDetail })));
+const Websites = lazy(() => import('./pages/work').then((m) => ({ default: m.Websites })));
+const WebsiteDetail = lazy(() => import('./pages/work').then((m) => ({ default: m.WebsiteDetail })));
+const Agreements = lazy(() => import('./pages/money').then((m) => ({ default: m.Agreements })));
+const AgreementDetail = lazy(() => import('./pages/money').then((m) => ({ default: m.AgreementDetail })));
+const Invoices = lazy(() => import('./pages/money').then((m) => ({ default: m.Invoices })));
+const InvoiceDetail = lazy(() => import('./pages/money').then((m) => ({ default: m.InvoiceDetail })));
+const Maintenance = lazy(() => import('./pages/ops').then((m) => ({ default: m.Maintenance })));
+const Tasks = lazy(() => import('./pages/ops').then((m) => ({ default: m.Tasks })));
+const CalendarPage = lazy(() => import('./pages/ops').then((m) => ({ default: m.CalendarPage })));
+const Documents = lazy(() => import('./pages/ops').then((m) => ({ default: m.Documents })));
+const Reports = lazy(() => import('./pages/system').then((m) => ({ default: m.Reports })));
+const SearchPage = lazy(() => import('./pages/system').then((m) => ({ default: m.SearchPage })));
+const SettingsPage = lazy(() => import('./pages/system').then((m) => ({ default: m.SettingsPage })));
+const ApiConsole = lazy(() => import('./pages/system').then((m) => ({ default: m.ApiConsole })));
+const ApiDocs = lazy(() => import('./pages/system').then((m) => ({ default: m.ApiDocs })));
+const ActivityPage = lazy(() => import('./pages/system').then((m) => ({ default: m.ActivityPage })));
+const NotFound = lazy(() => import('./pages/system').then((m) => ({ default: m.NotFound })));
+const PortalHome = lazy(() => import('./pages/portal').then((m) => ({ default: m.PortalHome })));
+const PortalProject = lazy(() => import('./pages/portal').then((m) => ({ default: m.PortalProject })));
 
 type NavItem = { to: string; label: string; icon: string; end?: boolean; countKey?: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -58,14 +77,27 @@ const ADMIN_NAV: NavGroup[] = [
   },
 ];
 
+const PORTAL_NAV: NavGroup[] = [
+  {
+    label: 'Your workspace',
+    items: [
+      { to: '/portal', label: 'Overview', icon: 'grid', end: true },
+      { to: '/portal#projects', label: 'Projects', icon: 'folder' },
+      { to: '/portal#invoices', label: 'Invoices', icon: 'receipt' },
+      { to: '/portal#documents', label: 'Documents', icon: 'doc' },
+      { to: '/portal#support', label: 'Support', icon: 'wrench' },
+    ],
+  },
+];
+
 function initials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
 }
 
-function Brand() {
+function Brand({ to }: { to: string }) {
   const { session } = useSession();
   return (
-    <Link to="/admin" className="brand" style={{ color: '#fff', textDecoration: 'none' }}>
+    <Link to={to} className="brand" style={{ color: '#fff', textDecoration: 'none' }}>
       <span className="brand-mark" aria-hidden="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
           <path d="M5 19 12 4l7 15M8.6 13.5h6.8" />
@@ -79,13 +111,21 @@ function Brand() {
   );
 }
 
-function Sidebar({ groups }: { groups: NavGroup[] }) {
+function Sidebar({
+  groups, open, home, footerName, footerRole, onNavigate,
+}: {
+  groups: NavGroup[];
+  open: boolean;
+  home: string;
+  footerName: string;
+  footerRole: string;
+  onNavigate: () => void;
+}) {
   const { session, logout } = useSession();
-  const user = session?.user;
   return (
-    <aside className="sidebar">
-      <Brand />
-      <nav className="nav" aria-label="Main navigation">
+    <aside className={`sidebar${open ? ' open' : ''}`} id="app-nav" aria-label="Navigation">
+      <Brand to={home} />
+      <nav className="nav">
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <div className="nav-label">{group.label}</div>
@@ -95,6 +135,7 @@ function Sidebar({ groups }: { groups: NavGroup[] }) {
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                onClick={onNavigate}
               >
                 <Icon name={item.icon} />
                 <span>{item.label}</span>
@@ -106,36 +147,33 @@ function Sidebar({ groups }: { groups: NavGroup[] }) {
           </div>
         ))}
       </nav>
-      {user ? (
-        <div className="sidebar-foot">
-          <div className="who">
-            <span className="avatar">{initials(user.name)}</span>
-            <span style={{ minWidth: 0 }}>
-              <span className="who-name" style={{ display: 'block' }}>{user.name}</span>
-              <span className="who-role">{user.role === 'admin' ? 'Administrator' : 'Staff'}</span>
-            </span>
-          </div>
-          <button
-            className="link-action"
-            style={{ color: '#9aa0a6', marginTop: 10, fontSize: 11.5 }}
-            onClick={() => void logout()}
-          >
-            Sign out
-          </button>
+      <div className="sidebar-foot">
+        <div className="who">
+          <span className="avatar">{initials(footerName)}</span>
+          <span style={{ minWidth: 0 }}>
+            <span className="who-name" style={{ display: 'block' }}>{footerName}</span>
+            <span className="who-role">{footerRole}</span>
+          </span>
         </div>
-      ) : null}
+        <button
+          className="link-action signout"
+          onClick={() => void logout()}
+        >
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }
 
-function Topbar({ title }: { title: string }) {
+function Topbar({ title, onMenu, onSearch }: { title: string; onMenu: () => void; onSearch?: () => void }) {
   const navigate = useNavigate();
   const [term, setTerm] = useState('');
   return (
     <header className="topbar">
-      <label className="nav-toggle-label" htmlFor="nav-toggle" aria-label="Toggle navigation">
-        <Icon name="menu" />
-      </label>
+      <button className="menu-btn" onClick={onMenu} aria-label="Open navigation" aria-controls="app-nav">
+        <Icon name="menu" size={18} />
+      </button>
       <div className="crumbs">
         <Link to="/admin">Workspace</Link>
         <span className="sep">/</span>
@@ -158,6 +196,11 @@ function Topbar({ title }: { title: string }) {
         />
         <button type="submit" aria-label="Search"><Icon name="search" size={14} /></button>
       </form>
+      {onSearch ? (
+        <button className="menu-btn" onClick={onSearch} aria-label="Search">
+          <Icon name="search" size={17} />
+        </button>
+      ) : null}
     </header>
   );
 }
@@ -184,41 +227,87 @@ function Guard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function PageFallback() {
+  return <div className="table-empty">Loading…</div>;
+}
+
 export function AdminShell() {
+  const { session } = useSession();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [navOpen, setNavOpen] = useState(false);
+
+  // Close the drawer whenever the route changes (link taps included).
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [navOpen]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [navOpen]);
+
   return (
     <Guard>
       <div className="app">
-        <input type="checkbox" id="nav-toggle" className="nav-toggle" aria-hidden="true" />
-        <Sidebar groups={ADMIN_NAV} />
+        {navOpen ? (
+          <button className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
+        ) : null}
+        <Sidebar
+          groups={ADMIN_NAV}
+          open={navOpen}
+          home="/admin"
+          footerName={session?.user?.name ?? 'Staff'}
+          footerRole={session?.user?.role === 'admin' ? 'Administrator' : 'Staff'}
+          onNavigate={() => setNavOpen(false)}
+        />
         <div className="main">
-          <Topbar title={currentTitle(location.pathname)} />
+          <Topbar
+            title={currentTitle(location.pathname)}
+            onMenu={() => setNavOpen(true)}
+            onSearch={() => navigate('/admin/search')}
+          />
           <main className="content">
-            <Routes>
-              <Route index element={<Dashboard />} />
-              <Route path="clients" element={<Clients />} />
-              <Route path="clients/:id" element={<ClientDetail />} />
-              <Route path="pipeline" element={<Pipeline />} />
-              <Route path="projects" element={<Projects />} />
-              <Route path="projects/:id" element={<ProjectDetail />} />
-              <Route path="websites" element={<Websites />} />
-              <Route path="websites/:id" element={<WebsiteDetail />} />
-              <Route path="agreements" element={<Agreements />} />
-              <Route path="agreements/:id" element={<AgreementDetail />} />
-              <Route path="invoices" element={<Invoices />} />
-              <Route path="invoices/:id" element={<InvoiceDetail />} />
-              <Route path="maintenance" element={<Maintenance />} />
-              <Route path="tasks" element={<Tasks />} />
-              <Route path="calendar" element={<CalendarPage />} />
-              <Route path="documents" element={<Documents />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="api" element={<ApiConsole />} />
-              <Route path="api/docs" element={<ApiDocs />} />
-              <Route path="activity" element={<ActivityPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route index element={<Dashboard />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="clients/:id" element={<ClientDetail />} />
+                <Route path="pipeline" element={<Pipeline />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route path="websites" element={<Websites />} />
+                <Route path="websites/:id" element={<WebsiteDetail />} />
+                <Route path="agreements" element={<Agreements />} />
+                <Route path="agreements/:id" element={<AgreementDetail />} />
+                <Route path="invoices" element={<Invoices />} />
+                <Route path="invoices/:id" element={<InvoiceDetail />} />
+                <Route path="maintenance" element={<Maintenance />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="calendar" element={<CalendarPage />} />
+                <Route path="documents" element={<Documents />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="search" element={<SearchPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="api" element={<ApiConsole />} />
+                <Route path="api/docs" element={<ApiDocs />} />
+                <Route path="activity" element={<ActivityPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </main>
         </div>
         <Toasts />
@@ -227,60 +316,51 @@ export function AdminShell() {
   );
 }
 
-function portalInitials(user: User): string {
-  return initials(user.client_name || user.name);
+function portalLabel(user: User): string {
+  return user.client_name || user.name;
 }
 
 export function PortalShell() {
-  const { session, loading, logout } = useSession();
+  const { session, loading } = useSession();
   const location = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [navOpen]);
+
   if (loading) return <div className="app-loading">Loading portal…</div>;
   if (!session?.user) return <Navigate to="/login" replace />;
   if (session.user.role !== 'client') return <Navigate to="/admin" replace />;
   const user = session.user;
+
   return (
     <div className="app">
-      <input type="checkbox" id="nav-toggle" className="nav-toggle" aria-hidden="true" />
-      <aside className="sidebar">
-        <Brand />
-        <nav className="nav" aria-label="Portal navigation">
-          <div className="nav-group">
-            <div className="nav-label">Your workspace</div>
-            <NavLink to="/portal" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-              <Icon name="grid" /><span>Overview</span>
-            </NavLink>
-            <NavLink to="/portal#projects" className="nav-item">
-              <Icon name="folder" /><span>Projects</span>
-            </NavLink>
-            <NavLink to="/portal#invoices" className="nav-item">
-              <Icon name="receipt" /><span>Invoices</span>
-            </NavLink>
-            <NavLink to="/portal#documents" className="nav-item">
-              <Icon name="doc" /><span>Documents</span>
-            </NavLink>
-            <NavLink to="/portal#support" className="nav-item">
-              <Icon name="wrench" /><span>Support</span>
-            </NavLink>
-          </div>
-        </nav>
-        <div className="sidebar-foot">
-          <div className="who">
-            <span className="avatar">{portalInitials(user)}</span>
-            <span style={{ minWidth: 0 }}>
-              <span className="who-name" style={{ display: 'block' }}>{user.client_name || user.name}</span>
-              <span className="who-role">Client</span>
-            </span>
-          </div>
-          <button className="link-action" style={{ color: '#9aa0a6', marginTop: 10, fontSize: 11.5 }} onClick={() => void logout()}>
-            Sign out
-          </button>
-        </div>
-      </aside>
+      {navOpen ? (
+        <button className="nav-backdrop" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
+      ) : null}
+      <Sidebar
+        groups={PORTAL_NAV}
+        open={navOpen}
+        home="/portal"
+        footerName={portalLabel(user)}
+        footerRole="Client"
+        onNavigate={() => setNavOpen(false)}
+      />
       <div className="main">
         <header className="topbar">
-          <label className="nav-toggle-label" htmlFor="nav-toggle" aria-label="Toggle navigation">
-            <Icon name="menu" />
-          </label>
+          <button className="menu-btn" onClick={() => setNavOpen(true)} aria-label="Open navigation" aria-controls="app-nav">
+            <Icon name="menu" size={18} />
+          </button>
           <div className="crumbs">
             <span>Client portal</span>
             <span className="sep">/</span>
@@ -291,11 +371,13 @@ export function PortalShell() {
           </div>
         </header>
         <main className="content">
-          <Routes>
-            <Route index element={<PortalHome />} />
-            <Route path="projects/:id" element={<PortalProject />} />
-            <Route path="*" element={<PortalHome />} />
-          </Routes>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route index element={<PortalHome />} />
+              <Route path="projects/:id" element={<PortalProject />} />
+              <Route path="*" element={<PortalHome />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
       <Toasts />

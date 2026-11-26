@@ -1,6 +1,6 @@
 // Typed access to the application API plus small display formatters.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type Row = Record<string, any>;
 export type List<T = Row> = {
@@ -57,11 +57,16 @@ export function useApi<T = any>(path: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(path));
   const [tick, setTick] = useState(0);
+  const lastBase = useRef<string | null>(null);
 
   useEffect(() => {
     if (!path) return;
     let alive = true;
-    setLoading(true);
+    // Filtering keeps the previous rows on screen (no flicker); switching to a
+    // different record shows the loading state instead of stale unrelated data.
+    const sameResource = lastBase.current === (path.split('?')[0] ?? null);
+    setLoading(!sameResource || lastBase.current === null);
+    lastBase.current = path.split('?')[0] ?? null;
     api<T>(path)
       .then((value) => {
         if (alive) {
@@ -82,6 +87,16 @@ export function useApi<T = any>(path: string | null) {
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
   return { data, error, loading, reload, setData };
+}
+
+/** Delays a fast-changing value (search boxes) so typing does not fire a request per key. */
+export function useDebounced<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
 }
 
 export function qs(params: Record<string, string | number | undefined | null>): string {

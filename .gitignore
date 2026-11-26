@@ -12,3 +12,6 @@ sdk/node_modules/
 
 web/*.tsbuildinfo
 *.tsbuildinfo
+
+# local screenshots used for verification
+artifacts/

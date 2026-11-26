@@ -1,7 +1,7 @@
 // Reports, search, settings, API operations and the audit log.
 
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, fmtDate, fmtDateTime, money, titleize, useApi, type List, type Row } from '../api';
 import { useSession } from '../session';
 import { FormModal } from '../forms';
@@ -152,12 +152,34 @@ export function Reports() {
 
 export function SearchPage() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const q = params.get('q') ?? '';
-  const { data, error, loading } = useApi<{ groups: { label: string; items: Row[] }[] }>(`/app/api/search?q=${encodeURIComponent(q)}`);
+  const [term, setTerm] = useState(q);
+  const { data, error, loading } = useApi<{ groups: { label: string; items: Row[] }[] }>(q ? `/app/api/search?q=${encodeURIComponent(q)}` : null);
 
   return (
     <>
       <PageHead eyebrow="Search" title={q ? `Results for “${q}”` : 'Search'} sub="Clients, leads, projects, websites, invoices, agreements and documents." />
+      <form
+        className="filters"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const value = term.trim();
+          if (value.length > 1) navigate(`/admin/search?q=${encodeURIComponent(value)}`);
+        }}
+      >
+        <input
+          className="input"
+          type="search"
+          value={term}
+          onChange={(event) => setTerm(event.target.value)}
+          placeholder="Search the workspace"
+          aria-label="Search"
+          autoFocus
+        />
+        <button className="btn accent" type="submit">Search</button>
+      </form>
       {error ? <Alert>{error}</Alert> : null}
       {loading ? <Loading /> : null}
       {!loading && data?.groups.length === 0 ? <Empty title="No matches" body="Try a shorter term or a client name." /> : null}

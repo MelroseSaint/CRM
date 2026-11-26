@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, fmtDate, fmtDateTime, money, titleize, useApi, type List, type Row } from '../api';
+import { api, fmtDate, fmtDateTime, money, titleize, useApi, useDebounced, type List, type Row } from '../api';
 import { useSession } from '../session';
 import { FormModal, type Field } from '../forms';
 import {
@@ -252,7 +252,8 @@ export function Invoices() {
   const [status, setStatus] = useState(params.get('status') ?? '');
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(params.get('new') === '1');
-  const { data, error, loading, reload } = useApi<{ totals: Row } & List>(`/app/api/invoices?q=${encodeURIComponent(q)}&status=${status}`);
+  const debouncedQ = useDebounced(q);
+  const { data, error, loading, reload } = useApi<{ totals: Row } & List>(`/app/api/invoices?q=${encodeURIComponent(debouncedQ)}&status=${status}`);
   const lookups = useApi<Lookups>('/app/api/lookups');
   const [created, setCreated] = useState<number | null>(null);
 

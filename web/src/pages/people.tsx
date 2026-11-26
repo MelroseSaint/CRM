@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, fmtDate, fmtDateShort, fmtDateTime, money, relTime, titleize, useApi, type List, type Row } from '../api';
+import { api, fmtDate, fmtDateShort, fmtDateTime, money, relTime, titleize, useApi, useDebounced, type List, type Row } from '../api';
 import { useSession } from '../session';
 import { FormModal, type Field } from '../forms';
 import {
@@ -23,7 +23,8 @@ export function Clients() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  const { data, error, loading, reload } = useApi<List>(`/app/api/clients${`?page=${page}&q=${encodeURIComponent(q)}&status=${status}`}`);
+  const debouncedQ = useDebounced(q);
+  const { data, error, loading, reload } = useApi<List>(`/app/api/clients${`?page=${page}&q=${encodeURIComponent(debouncedQ)}&status=${status}`}`);
 
   const fields: Field[] = [
     { name: 'name', label: 'Client name', required: true },

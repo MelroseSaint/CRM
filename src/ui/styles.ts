@@ -54,13 +54,14 @@ code, .mono { font-family: var(--mono); font-size: .86em; }
   display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
   overflow-y: auto; z-index: 30;
 }
-.brand { display: flex; align-items: center; gap: 11px; padding: 20px 18px 18px; }
+.brand { display: flex; align-items: center; gap: 11px; padding: 20px 18px 18px; min-width: 0; }
+.brand > span:last-child { min-width: 0; }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 6px; background: var(--accent);
   display: grid; place-items: center; color: #fff; flex: none;
 }
-.brand-name { font-family: var(--serif); font-size: 19px; letter-spacing: .01em; line-height: 1.1; color: #fff; }
-.brand-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--sidebar-muted); margin-top: 3px; }
+.brand-name { display: block; font-family: var(--serif); font-size: 19px; letter-spacing: .01em; line-height: 1.1; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { display: block; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--sidebar-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav { flex: 1; }
 .nav-group { padding: 14px 12px 4px; }
 .nav-label {
@@ -156,7 +157,7 @@ code, .mono { font-family: var(--mono); font-size: .86em; }
 .stat-value.is-ok { color: var(--accent); }
 
 /* ---------------------------------------------------------------- panels & grids */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
 .panel-head {
   display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--line);
 }
@@ -170,7 +171,8 @@ code, .mono { font-family: var(--mono); font-size: .86em; }
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .grid-main { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); align-items: start; }
 .grid-detail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
-.stack { display: grid; gap: 10px; }
+.stack { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.grid > * { min-width: 0; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .row-tight { display: flex; gap: 6px; align-items: center; }
 .spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

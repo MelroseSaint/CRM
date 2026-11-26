@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, fmtDate, fmtDateShort, fmtDateTime, money, relTime, titleize, useApi, type List, type Row } from '../api';
+import { api, fmtDate, fmtDateShort, fmtDateTime, money, relTime, titleize, useApi, useDebounced, type List, type Row } from '../api';
 import { useSession } from '../session';
 import { FormModal, type Field } from '../forms';
 import {
@@ -27,7 +27,8 @@ export function Projects() {
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
-  const { data, error, loading } = useApi<List>(`/app/api/projects?q=${encodeURIComponent(q)}&status=${status}`);
+  const debouncedQ = useDebounced(q);
+  const { data, error, loading } = useApi<List>(`/app/api/projects?q=${encodeURIComponent(debouncedQ)}&status=${status}`);
   const lookups = useApi<Lookups>('/app/api/lookups');
 
   const fields: Field[] = [
@@ -343,7 +344,8 @@ export function Websites() {
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
-  const { data, error, loading } = useApi<List>(`/app/api/websites?q=${encodeURIComponent(q)}&status=${status}`);
+  const debouncedQ = useDebounced(q);
+  const { data, error, loading } = useApi<List>(`/app/api/websites?q=${encodeURIComponent(debouncedQ)}&status=${status}`);
   const lookups = useApi<Lookups>('/app/api/lookups');
 
   const fields: Field[] = [
