@@ -25,11 +25,12 @@ shell will prompt and fail; use the procedure below instead.
    (`owner: MelroseSaint`, `repo: CRM`, `read_only: false`, title `Anvil Ops push (temporary)`,
    `key:` the contents of `~/.ssh/anvil_push.pub`). Keep the returned `id`.
 
-3. Push over SSH on port 443, leaving `origin` untouched as HTTPS:
+3. Push over SSH on port 443, leaving `origin` untouched as HTTPS. The destination must be given
+   explicitly as an SSH URL — `core.sshCommand` does not rewrite an HTTPS remote:
 
    ```bash
-   git -c core.sshCommand="ssh -i $HOME/.ssh/anvil_push -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -p 443 git@ssh.github.com" \
-     push origin HEAD:main
+   git -c core.sshCommand="ssh -i $HOME/.ssh/anvil_push -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -p 443" \
+     push git@ssh.github.com:MelroseSaint/CRM.git HEAD:main
    ```
 
 4. Verify, then clean up immediately:
