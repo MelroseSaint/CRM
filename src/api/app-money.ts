@@ -156,9 +156,10 @@ export function appMoneyRoutes() {
     );
     const totals = await one<Record<string, number>>(
       c.env.DB,
-      `SELECT COALESCE(SUM(CASE WHEN status NOT IN ('draft','cancelled') THEN total_cents ELSE 0 END),0) AS invoiced_cents,
-              COALESCE(SUM(CASE WHEN status NOT IN ('draft','cancelled') THEN paid_cents ELSE 0 END),0) AS collected_cents,
-              COALESCE(SUM(CASE WHEN status IN ('unpaid','partially_paid','overdue') THEN total_cents-paid_cents ELSE 0 END),0) AS outstanding_cents`,
+      `SELECT COALESCE(SUM(CASE WHEN i.status NOT IN ('draft','cancelled') THEN i.total_cents ELSE 0 END),0) AS invoiced_cents,
+              COALESCE(SUM(CASE WHEN i.status NOT IN ('draft','cancelled') THEN i.paid_cents ELSE 0 END),0) AS collected_cents,
+              COALESCE(SUM(CASE WHEN i.status IN ('unpaid','partially_paid','overdue') THEN i.total_cents-i.paid_cents ELSE 0 END),0) AS outstanding_cents
+         FROM invoices i`,
     );
     return json({ ...paged(rowsData, total, page, perPage), totals });
   });

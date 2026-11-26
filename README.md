@@ -33,6 +33,20 @@ scripts/demo.sql      optional sample dataset (local evaluation only)
 scripts/test-api.mts  end-to-end integration suite
 ```
 
+## Signing in
+
+A fresh database starts on `/setup`, where you create the first administrator. The local demo seed
+(`npm run db:demo`) adds two accounts:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | `admin@anvil.test` | `AnvilOps-2026!` |
+| Client (portal) | `portal@anvil.test` | `PortalPass-2026!` |
+
+Change or delete these before using the workspace for real client data — they are public demo
+credentials, not a secret. Password resets for staff accounts are under Settings → Users; a portal
+account is created from the client record with an email and a password of at least 10 characters.
+
 ## Run it locally
 
 ```bash

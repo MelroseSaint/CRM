@@ -31,7 +31,7 @@ const NotFound = lazy(() => import('./pages/system').then((m) => ({ default: m.N
 const PortalHome = lazy(() => import('./pages/portal').then((m) => ({ default: m.PortalHome })));
 const PortalProject = lazy(() => import('./pages/portal').then((m) => ({ default: m.PortalProject })));
 
-type NavItem = { to: string; label: string; icon: string; end?: boolean; countKey?: string };
+type NavItem = { to: string; label: string; icon: string; end?: boolean; countKey?: string; hash?: string; root?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
 const ADMIN_NAV: NavGroup[] = [
@@ -81,11 +81,11 @@ const PORTAL_NAV: NavGroup[] = [
   {
     label: 'Your workspace',
     items: [
-      { to: '/portal', label: 'Overview', icon: 'grid', end: true },
-      { to: '/portal#projects', label: 'Projects', icon: 'folder' },
-      { to: '/portal#invoices', label: 'Invoices', icon: 'receipt' },
-      { to: '/portal#documents', label: 'Documents', icon: 'doc' },
-      { to: '/portal#support', label: 'Support', icon: 'wrench' },
+      { to: '/portal', label: 'Overview', icon: 'grid', end: true, root: true },
+      { to: '/portal#projects', label: 'Projects', icon: 'folder', hash: '#projects' },
+      { to: '/portal#invoices', label: 'Invoices', icon: 'receipt', hash: '#invoices' },
+      { to: '/portal#documents', label: 'Documents', icon: 'doc', hash: '#documents' },
+      { to: '/portal#support', label: 'Support', icon: 'wrench', hash: '#support' },
     ],
   },
 ];
@@ -122,6 +122,8 @@ function Sidebar({
   onNavigate: () => void;
 }) {
   const { session, logout } = useSession();
+  const location = useLocation();
+  const navigate = useNavigate();
   return (
     <aside className={`sidebar${open ? ' open' : ''}`} id="app-nav" aria-label="Navigation">
       <Brand to={home} />
@@ -129,21 +131,47 @@ function Sidebar({
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <div className="nav-label">{group.label}</div>
-            {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-                onClick={onNavigate}
-              >
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-                {item.countKey && session?.nav?.[item.countKey] ? (
-                  <span className="nav-count">{session.nav[item.countKey]}</span>
-                ) : null}
-              </NavLink>
-            ))}
+            {group.items.map((item) => {
+              const count = item.countKey && session?.nav?.[item.countKey] ? (
+                <span className="nav-count">{session.nav[item.countKey]}</span>
+              ) : null;
+              // Section links (portal hash targets) scroll instead of re-matching the route,
+              // so their active state is derived from the hash rather than the pathname.
+              if (item.hash || item.root) {
+                const active = item.root
+                  ? location.pathname === '/portal' && !location.hash
+                  : location.pathname === '/portal' && location.hash === item.hash;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`nav-item${active ? ' active' : ''}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigate(item.to);
+                      onNavigate();
+                    }}
+                  >
+                    <Icon name={item.icon} />
+                    <span>{item.label}</span>
+                    {count}
+                  </Link>
+                );
+              }
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  onClick={onNavigate}
+                >
+                  <Icon name={item.icon} />
+                  <span>{item.label}</span>
+                  {count}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
@@ -242,6 +270,16 @@ export function AdminShell() {
     setNavOpen(false);
   }, [location.pathname, location.search]);
 
+  // Scroll to a portal section once the destination panel has rendered.
+  useEffect(() => {
+    if (!location.hash) return;
+    const target = location.hash;
+    const timer = window.setTimeout(() => {
+      document.querySelector(target)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, location.pathname]);
+
   useEffect(() => {
     if (!navOpen) return;
     const previous = document.body.style.overflow;
@@ -328,6 +366,16 @@ export function PortalShell() {
   useEffect(() => {
     setNavOpen(false);
   }, [location.pathname, location.search]);
+
+  // Scroll to a portal section once the destination panel has rendered.
+  useEffect(() => {
+    if (!location.hash) return;
+    const target = location.hash;
+    const timer = window.setTimeout(() => {
+      document.querySelector(target)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, location.pathname]);
 
   useEffect(() => {
     if (!navOpen) return;

@@ -13,11 +13,34 @@ import { appWorkRoutes } from './app-work';
 import { appMoneyRoutes } from './app-money';
 import { appConsoleRoutes } from './app-console';
 
+/**
+ * Rejects browser writes that did not originate from this application. Browsers
+ * always send Origin on cross-site writes; same-origin fetches send our own host.
+ * Requests without Origin (curl, scripts, tests) still need a valid CSRF token.
+ */
+function trustedOrigin(c: { req: { header: (n: string) => string | undefined; url: string } }): boolean {
+  // Browsers set Sec-Fetch-Site themselves and scripts cannot forge it, so it is
+  // the reliable signal: a cross-site write is never allowed. Reverse proxies may
+  // rewrite Host/URL to an internal address, so Origin is only a fallback for
+  // older clients that do not send fetch metadata.
+  const site = c.req.header('sec-fetch-site');
+  if (site) return site !== 'cross-site';
+  const origin = c.req.header('origin');
+  if (!origin) return true;
+  const hosts = new Set([c.req.header('host') ?? '', new URL(c.req.url).host]);
+  try {
+    return hosts.has(new URL(origin).host);
+  } catch {
+    return false;
+  }
+}
+
 export function appApiRoutes() {
   const app = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
   app.use('*', async (c, next) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
+      if (!trustedOrigin(c)) return fail(403, 'This origin is not allowed to change data.');
       const token = c.req.header('x-csrf-token') ?? '';
       if (!csrfValid(c, token)) {
         return fail(403, 'The request token is missing or expired. Reload the page and try again.');

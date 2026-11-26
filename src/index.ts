@@ -22,6 +22,8 @@ function securityHeaders(c: { req: { url: string } }, res: Response): void {
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   h.set('Cross-Origin-Opener-Policy', 'same-origin');
+  h.set('Cross-Origin-Resource-Policy', 'same-origin');
+  h.set('X-Permitted-Cross-Domain-Policies', 'none');
   if (new URL(c.req.url).protocol === 'https:') h.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 }
 
@@ -83,6 +85,8 @@ app.use('*', async (c, next) => {
         "font-src 'self' data:",
         "connect-src 'self'",
         "frame-ancestors 'self' https://*.freebuff.site https://*.agent37.app",
+        "frame-src 'none'",
+        "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
       ].join('; '),

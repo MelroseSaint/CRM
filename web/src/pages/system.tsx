@@ -267,11 +267,13 @@ export function SettingsPage() {
         <Panel title="Security posture">
           <KV items={[
             ['Password hashing', 'PBKDF2-SHA256, 150k iterations'],
-            ['Sessions', 'Hashed IDs, HttpOnly SameSite=Lax, 12h'],
+            ['Sessions', 'Hashed IDs, HttpOnly, 12h, SameSite=None on HTTPS'],
             ['CSRF', 'Per-session token, required on writes'],
+            ['Request origin', 'Cross-site writes rejected (Sec-Fetch-Site)'],
             ['Login throttling', '8 failures per 15 minutes'],
             ['Roles', 'Administrator, Staff, Client'],
             ['Portal isolation', 'Server-side client scope on every query'],
+            ['Portal payloads', 'Internal budget, notes and plans never serialised'],
             ['Sign-in lockout', 'Account status checked on every request'],
           ]} />
         </Panel>

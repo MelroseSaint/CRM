@@ -72,7 +72,13 @@ export function appAuthRoutes() {
       email,
     );
 
-    const ok = user ? await verifyPassword(password, user.password_hash, user.password_salt, user.iterations) : false;
+    // Always run PBKDF2 so a missing account cannot be told apart by response time.
+    const ok = await verifyPassword(
+      password,
+      user?.password_hash ?? 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+      user?.password_salt ?? 'AAAAAAAAAAAAAAAAAAAAAA',
+      user?.iterations ?? 150_000,
+    );
     if (!user || !ok || user.status !== 'active') {
       await recordLoginAttempt(c.env.DB, email, ip, false);
       await audit(c, 'auth.login_failed', 'user', user?.id ?? null, { email });

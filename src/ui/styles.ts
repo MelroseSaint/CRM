@@ -331,9 +331,9 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .bar.thin { height: 4px; }
 .dist-row { display: grid; grid-template-columns: 118px 1fr 34px; gap: 10px; align-items: center; padding: 6px 0; font-size: 12px; }
 .dist-row .n { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: right; }
-.rev-chart { display: flex; align-items: flex-end; gap: 6px; height: 132px; padding-top: 8px; }
-.rev-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; min-width: 0; }
-.rev-bars { display: flex; gap: 2px; align-items: flex-end; width: 100%; justify-content: center; height: 100%; }
+.rev-chart { display: flex; align-items: stretch; gap: 6px; height: 132px; padding-top: 8px; }
+.rev-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; min-width: 0; height: 100%; }
+.rev-bars { display: flex; gap: 2px; align-items: flex-end; width: 100%; justify-content: center; flex: 1 1 auto; min-height: 0; }
 .rev-bars .b1 { width: 46%; background: #cddfd8; border-radius: 2px 2px 0 0; min-height: 2px; }
 .rev-bars .b2 { width: 46%; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; }
 .rev-x { font-size: 9.5px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }

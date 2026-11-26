@@ -148,14 +148,21 @@ export function queueCookie(c: AppContext, cookie: string): void {
   c.set('cookies', list);
 }
 
+/**
+ * Session cookies need SameSite=None over HTTPS so the app also works when it is
+ * embedded in the preview panel's iframe (a cross-site frame). Every mutating
+ * request is still protected by a per-session CSRF token and an Origin check.
+ */
+function cookieAttributes(c: AppContext): string {
+  return new URL(c.req.url).protocol === 'https:' ? '; SameSite=None; Secure' : '; SameSite=Lax';
+}
+
 export function serializeSessionCookie(c: AppContext, value: string, maxAge: number): string {
-  const secure = new URL(c.req.url).protocol === 'https:' ? '; Secure' : '';
-  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly${cookieAttributes(c)}; Max-Age=${maxAge}`;
 }
 
 export function serializeCsrfCookie(c: AppContext, value: string, maxAge = 12 * 3600): string {
-  const secure = new URL(c.req.url).protocol === 'https:' ? '; Secure' : '';
-  return `anvil_csrf=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  return `anvil_csrf=${value}; Path=/; HttpOnly${cookieAttributes(c)}; Max-Age=${maxAge}`;
 }
 
 export function clientIp(c: { req: { header: (n: string) => string | undefined } }): string {

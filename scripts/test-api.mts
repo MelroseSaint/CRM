@@ -21,6 +21,7 @@ class Session {
   cookies = new Map<string, string>();
   csrf = '';
   user: any = null;
+  loginSetCookies: string[] = [];
 
   header(): string {
     return [...this.cookies.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
@@ -39,7 +40,8 @@ class Session {
     if (method !== 'GET' && this.csrf) headers['x-csrf-token'] = this.csrf;
 
     const res = await fetch(`${BASE}${path}`, { method, headers, body, redirect: 'manual' });
-    for (const raw of res.headers.getSetCookie?.() ?? []) {
+    const setCookies = res.headers.getSetCookie?.() ?? [];
+    for (const raw of setCookies) {
       const [pair] = raw.split(';');
       const index = pair.indexOf('=');
       const name = pair.slice(0, index);
@@ -54,7 +56,7 @@ class Session {
     } catch {
       data = { raw: text.slice(0, 200) };
     }
-    return { status: res.status, data };
+    return { status: res.status, data, setCookies };
   }
 
   async open(): Promise<void> {
@@ -65,6 +67,7 @@ class Session {
   async login(email: string, password: string) {
     await this.open();
     const res = await this.call('/app/api/session', { body: { email, password } });
+    this.loginSetCookies = res.setCookies ?? [];
     this.user = res.data?.user ?? null;
     if (res.data?.csrf) this.csrf = res.data.csrf;
     return res;
@@ -175,6 +178,9 @@ async function main(): Promise<void> {
   });
   await admin.call(`/app/api/invoices/${pendingInvoice.data.id}/send`, { body: {} });
 
+  const invoiceList = await admin.call('/app/api/invoices');
+  check('invoice list loads with totals', invoiceList.status === 200 && Array.isArray(invoiceList.data?.rows) && Number(invoiceList.data?.totals?.invoiced_cents) >= 0, invoiceList.status);
+
   // ---------------------------------------------------------------- agreements
   const agreement = await admin.call('/app/api/agreements', {
     body: { client_id: clientId, title: `Test Agreement ${suffix}`, amount: '2400', body: 'Terms of the engagement.', scope: 'Design and build.' },
@@ -221,6 +227,79 @@ async function main(): Promise<void> {
 
   const internalDownload = await portal.call(`/app/api/documents/${internalDoc.data.id}/download`);
   check('internal document is hidden from the portal', internalDownload.status === 404, internalDownload.status);
+
+  // ---------------------------------------------------------------- portal hardening
+  const foreignSite = await admin.call('/app/api/websites', {
+    body: { client_id: Number(otherClient.data.id), name: `Foreign site ${suffix}`, domain: `foreign-${suffix}.example` },
+  });
+  const crossClientSite = await portal.call('/app/api/portal/requests', {
+    body: { title: 'Wrong site', website_id: foreignSite.data.id },
+  });
+  check("portal rejects another client's website id on a request", crossClientSite.status === 422, crossClientSite);
+
+  const portalProjectDetail = await portal.call(`/app/api/portal/projects/${projectId}`);
+  const portalProjectRow = portalProjectDetail.data?.project ?? {};
+  check(
+    'portal project detail hides internal billing fields',
+    portalProjectDetail.status === 200 &&
+      portalProjectRow.name === `Test Project ${suffix}` &&
+      !('budget_cents' in portalProjectRow) &&
+      !('notes' in portalProjectRow) &&
+      !('payment_structure' in portalProjectRow),
+    Object.keys(portalProjectRow),
+  );
+
+  const sessionCookie = admin.loginSetCookies.find((value) => value.startsWith('anvil_session='));
+  const secureContext = BASE.startsWith('https://');
+  check(
+    'session cookie is HttpOnly with a HTTPS-safe SameSite policy',
+    Boolean(sessionCookie) &&
+      /HttpOnly/.test(sessionCookie ?? '') &&
+      (secureContext
+        ? /SameSite=None/.test(sessionCookie ?? '') && /Secure/.test(sessionCookie ?? '')
+        : /SameSite=Lax/.test(sessionCookie ?? '')),
+    sessionCookie,
+  );
+
+  const evilOrigin = await fetch(`${BASE}/app/api/clients`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: admin.header(),
+      'x-csrf-token': admin.csrf,
+      origin: 'https://evil.example',
+    },
+    body: JSON.stringify({ name: 'Origin test' }),
+  });
+  check('cross-origin writes are rejected', evilOrigin.status === 403, evilOrigin.status);
+
+  const sameOrigin = await fetch(`${BASE}/app/api/clients`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: admin.header(),
+      'x-csrf-token': admin.csrf,
+      origin: BASE,
+    },
+    body: JSON.stringify({ name: `Origin test ${suffix}` }),
+  });
+  check('same-origin writes still work', sameOrigin.status === 201, sameOrigin.status);
+  if (sameOrigin.status === 201) {
+    const originClient = await sameOrigin.json().catch(() => null);
+    if (originClient?.id) await admin.call(`/app/api/clients/${originClient.id}`, { method: 'DELETE' });
+  }
+
+  const crossSiteFetch = await fetch(`${BASE}/app/api/clients`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: admin.header(),
+      'x-csrf-token': admin.csrf,
+      'sec-fetch-site': 'cross-site',
+    },
+    body: JSON.stringify({ name: 'Cross site test' }),
+  });
+  check('cross-site fetch metadata is rejected', crossSiteFetch.status === 403, crossSiteFetch.status);
 
   // portal payment claim stays pending
   const claim = await portal.call(`/app/api/portal/invoices/${pendingInvoice.data.id}/claim`, {

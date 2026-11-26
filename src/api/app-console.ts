@@ -342,9 +342,11 @@ export function appConsoleRoutes() {
     const user = guardClient(c);
     if (user instanceof Response) return user;
     const id = Number(c.req.param('id'));
+    // Only client-facing columns: internal notes, budget and payment plan stay staff-side.
     const project = await one<Record<string, unknown>>(
       c.env.DB,
-      'SELECT * FROM projects WHERE id=? AND client_id=? AND portal_visible=1',
+      `SELECT id, name, status, description, scope, category, start_date, due_date
+         FROM projects WHERE id=? AND client_id=? AND portal_visible=1`,
       id, user.client_id,
     );
     if (!project) return fail(404, 'Project not found.');
@@ -363,12 +365,20 @@ export function appConsoleRoutes() {
     const body = await readBody(c);
     const title = str(body, 'title', 200);
     if (!title) return fail(422, 'Describe what you need.', { title: 'Required.' });
+    // A client may only attach one of its own websites (never another client's id).
+    const websiteId = Number(body.website_id) || null;
+    if (websiteId) {
+      const owned = await one(c.env.DB, 'SELECT id FROM websites WHERE id=? AND client_id=?', websiteId, user.client_id);
+      if (!owned) return fail(422, 'Choose one of your websites.', { website_id: 'Not available.' });
+    }
+    const priorityInput = str(body, 'priority', 20);
+    const priority = ['low', 'medium', 'high', 'urgent'].includes(priorityInput) ? priorityInput : 'medium';
     const id = await insert(
       c.env.DB,
       `INSERT INTO maintenance_requests(client_id, website_id, title, description, priority, status, submitted_at,
         source, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-      user.client_id, body.website_id ? Number(body.website_id) : null, title,
-      nullable(body, 'description', 4000), str(body, 'priority', 20) || 'medium', 'submitted',
+      user.client_id, websiteId, title,
+      nullable(body, 'description', 4000), priority, 'submitted',
       nowIso(), 'portal', nowIso(), nowIso(),
     );
     await audit(c, 'maintenance.requested_by_client', 'maintenance_request', id, { title });
@@ -431,6 +441,9 @@ export function appConsoleRoutes() {
     if (!agreement) return fail(404, 'Agreement not found.');
     if (agreement.accepted_at) return fail(409, 'This agreement has already been accepted.');
     if (!['sent', 'viewed'].includes(String(agreement.status))) return fail(409, 'This agreement is not open for acceptance.');
+    if (agreement.expires_at && String(agreement.expires_at) < today()) {
+      return fail(409, 'This agreement has expired. Ask the studio for an updated copy.');
+    }
     const body = await readBody(c);
     const name = str(body, 'name', 120);
     const consent = body.consent === true || body.consent === 'on' || body.consent === '1';

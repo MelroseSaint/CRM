@@ -26,6 +26,9 @@ export function Dashboard() {
   if (!data) return null;
   const { kpis, revenue, pipeline, renewals, invoices, tasks, activity, projects } = data;
   const max = Math.max(1, ...revenue.flatMap((row) => [row.invoiced, row.collected]));
+  // Pixel heights: percentage heights inside nested flex items collapse to zero.
+  const chartHeight = 96;
+  const barHeight = (value: number) => `${Math.max(2, Math.round((Number(value) / max) * chartHeight))}px`;
   const healthTotal = Object.values(kpis.health ?? {}).reduce((sum, n) => sum + Number(n), 0);
   const pipelineTotal = pipeline.reduce((sum, row) => sum + row.count, 0);
 
@@ -62,8 +65,8 @@ export function Dashboard() {
               {revenue.map((row) => (
                 <div className="rev-col" key={row.month} title={`${row.month}: invoiced ${money(row.invoiced, currency)}, collected ${money(row.collected, currency)}`}>
                   <div className="rev-bars">
-                    <div className="b1" style={{ height: `${Math.round((row.invoiced / max) * 100)}%` }} />
-                    <div className="b2" style={{ height: `${Math.round((row.collected / max) * 100)}%` }} />
+                    <div className="b1" style={{ height: barHeight(row.invoiced) }} />
+                    <div className="b2" style={{ height: barHeight(row.collected) }} />
                   </div>
                   <div className="rev-x">{row.month.slice(5)}</div>
                 </div>

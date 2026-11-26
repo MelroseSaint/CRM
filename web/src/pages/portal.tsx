@@ -49,7 +49,7 @@ export function PortalHome() {
 
       <div className="grid grid-main">
         <div className="stack" style={{ gap: 16 }}>
-          <Panel title="Your projects" flush>
+          <Panel title="Your projects" flush id="projects">
             {data.projects.length === 0 ? (
               <div className="table-empty">No projects are shared yet.</div>
             ) : data.projects.map((project: Row) => (
