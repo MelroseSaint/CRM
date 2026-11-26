@@ -193,6 +193,35 @@ npx wrangler deploy
 Run `/setup` on the deployed origin to create the administrator account. Put any provider tokens
 (email, deployment providers) in Worker secrets, not in `wrangler.jsonc` vars.
 
+## Pushing to GitHub
+
+The remote is `https://github.com/MelroseSaint/CRM.git`. Pushes authenticate with a token held in
+the environment, never in the repository:
+
+```bash
+npm run push             # pushes the current branch to origin
+npm run push -- --tags   # any extra arguments go to git push
+```
+
+`scripts/push.sh` reads `GITHUB_TOKEN` and passes it to git through `scripts/git-askpass.sh`
+(`GIT_ASKPASS`), so the token is never written to disk, a config file or shell history. It also
+refuses to run when `origin` is not the URL above, so a changed remote cannot receive the token.
+
+One-time setup, once per project (not once per chat):
+
+1. Create a fine-grained token for `MelroseSaint/CRM` with **Contents: Read and write** and an
+   expiry you are comfortable with: <https://github.com/settings/personal-access-tokens/new>
+2. Save it as the project secret **`GITHUB_TOKEN`** under Settings → Project settings → Secrets.
+3. Run `npm run push`. It keeps working in new chats and after the sandbox is rebuilt, because both
+   the scripts and the secret belong to the project rather than to a session.
+
+Revoke at any time by deleting the token on GitHub (effective immediately) and then deleting the
+`GITHUB_TOKEN` secret in project settings. No SSH keys or deploy keys are required for this path.
+
+If the secret is unavailable, the connected GitHub account can still publish changes through the
+agent (it creates a short-lived, repo-scoped deploy key, pushes, then deletes the key), so a missing
+secret is never a dead end.
+
 ## Scope and honest limits
 
 Implemented and tested: the modules above, the API, the SDK, webhooks, monitoring and the

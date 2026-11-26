@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit && npm --prefix web run typecheck",
     "test": "npm run typecheck && npm run test:api",
     "test:api": "node scripts/test-api.mts",
+    "push": "bash scripts/push.sh",
     "sdk:build": "cd sdk && npm install --no-audit --no-fund && npm run build",
     "sdk:typecheck": "cd sdk && npm install --no-audit --no-fund && npm run typecheck"
   },
