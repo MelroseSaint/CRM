@@ -78,6 +78,24 @@ const suffix = Date.now().toString(36).slice(-6);
 
 async function main(): Promise<void> {
   const admin = new Session();
+
+  // A freshly initialised database has no accounts, so perform first-run setup
+  // with the configured credentials before signing in.
+  const initial = await admin.call('/app/api/session');
+  admin.csrf = initial.data?.csrf ?? '';
+  if (initial.data?.setup_needed) {
+    const setup = await admin.call('/app/api/setup', {
+      body: {
+        name: 'Test Administrator',
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        password2: ADMIN_PASSWORD,
+        business: 'Anvil Test',
+      },
+    });
+    check('first-run setup creates the administrator', setup.status === 201 || setup.status === 200, setup);
+  }
+
   const login = await admin.login(ADMIN_EMAIL, ADMIN_PASSWORD);
   check('administrator can sign in', login.status === 200 && login.data?.user?.role === 'admin', login);
   if (login.status !== 200) {

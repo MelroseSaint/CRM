@@ -2,7 +2,7 @@
 -- This is NOT installed automatically and is not required for the platform to work.
 -- Run: npm run db:demo   (local D1 only)
 -- Every record below is created through the same tables the application writes to.
--- Delete it with: npm run db:reset-demo  (see package.json / README).
+-- Remove it by resetting the local database: rm -rf .wrangler/state && npm run db:init
 
 -- clients ------------------------------------------------------------------
 INSERT INTO clients (name, company, email, phone, address, category, socials, preferred_contact, acquired_at, status, notes, lead_source, inquiry_date, services_discussed, created_at, updated_at)
@@ -186,4 +186,12 @@ VALUES
  (3,'inbound','health','fail','Certificate renewal overdue by 2 days','{"status":"fail","message":"TLS renewal failed"}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-9 day'));
 
 -- Lets the sign-in screen show the demo accounts (local evaluation only).
+-- accounts -----------------------------------------------------------------
+-- Public demo credentials, created with the same PBKDF2 hashing the app uses.
+-- Never load this dataset into a database that holds real data.
+INSERT OR IGNORE INTO users(email, name, role, client_id, password_hash, password_salt, iterations, status, created_at)
+VALUES
+ ('admin@anvil.test', 'Demo Administrator', 'admin', NULL, 'Q-Y4of9Dg4G4lq5ElGoL9PNbmTdrLqmn9vgMSVNvSBQ', 'i-oWhYgtoH2MAwXhJzxZdg', 150000, 'active', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ ('portal@anvil.test', 'Mara Ellison', 'client', (SELECT id FROM clients WHERE email = 'mara@meridiancoffee.example' ORDER BY id LIMIT 1), 'Wn291M3cNvvhBC_Mr3KwE0gvBYB8iLf5v6eEFTStYf0', 'X2JOvDjSAgXceUy0cBZJbw', 150000, 'active', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
 INSERT OR REPLACE INTO settings(key, value) VALUES ('demo_mode', '1');

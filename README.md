@@ -35,8 +35,9 @@ scripts/test-api.mts  end-to-end integration suite
 
 ## Signing in
 
-A fresh database starts on `/setup`, where you create the first administrator. The local demo seed
-(`npm run db:demo`) adds two accounts:
+A fresh database starts on `/setup`, where you create the first administrator — that is the only
+account a new workspace needs. The optional demo seed (`npm run db:demo`, local evaluation only)
+also adds these two public accounts and turns on the demo banner on the sign-in screen:
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -49,9 +50,12 @@ account is created from the client record with an email and a password of at lea
 
 ## Run it locally
 
+Node 22.6 or newer is required: the test runner executes `scripts/test-api.mts` directly, which
+relies on Node's built-in TypeScript support.
+
 ```bash
-npm install
-npm run web:install      # installs the React app's dependencies
+npm ci                   # installs from package-lock.json, nothing is upgraded
+npm run web:install      # installs the React app's dependencies from its lockfile
 npm run db:init          # create tables in the local D1 database
 npm run build            # compiles the React app into web/dist
 npm run dev              # wrangler dev on http://localhost:3000
@@ -86,7 +90,9 @@ npm run test:api         # drives the running app over HTTP
 ```
 
 The suite runs against `http://127.0.0.1:3000` (override with `TEST_BASE`, `TEST_EMAIL`,
-`TEST_PASSWORD`) and covers sign-in and CSRF rejection, client and project CRUD, milestone and
+`TEST_PASSWORD`). On a database with no accounts it performs first-run setup itself using
+`TEST_EMAIL` and `TEST_PASSWORD` (defaults `admin@anvil.test` / `AnvilOps-2026!`), so
+`npm run db:init` alone is enough before a test run. It covers sign-in and CSRF rejection, client and project CRUD, milestone and
 deliverable storage, a real availability check with its measured source, invoice totals, the rule
 that a pending payment never settles an invoice, overpayment refusal, payment confirmation, portal
 isolation (including another client's invoice and an internal document), portal payment claims,
