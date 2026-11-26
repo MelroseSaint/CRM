@@ -46,6 +46,7 @@ export function appAuthRoutes() {
         business_name: settings.business_name ?? 'Anvil Ops',
         currency: settings.currency ?? 'USD',
         portal_welcome: settings.portal_welcome ?? '',
+        demo_mode: settings.demo_mode === '1',
       },
       nav,
     });
@@ -163,7 +164,11 @@ export function appAuthRoutes() {
 
   app.get('/settings/public', async (c) => {
     const settings = await getSettings(c.env.DB);
-    return json({ business_name: settings.business_name ?? '', currency: settings.currency ?? 'USD' });
+    return json({
+      business_name: settings.business_name ?? '',
+      currency: settings.currency ?? 'USD',
+      demo_mode: settings.demo_mode === '1',
+    });
   });
 
   app.get('/csrf', (c) => json({ csrf: c.get('csrf') }));

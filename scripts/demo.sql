@@ -184,3 +184,6 @@ VALUES
  (1,'inbound','deployment','ok','Deployment succeeded (bld_8831)','{"status":"succeeded","environment":"production","build_id":"bld_8831"}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 day')),
  (2,'inbound','metadata','ok','Metadata synchronised (production)','{"technology":{"framework":"Astro 5"}}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')),
  (3,'inbound','health','fail','Certificate renewal overdue by 2 days','{"status":"fail","message":"TLS renewal failed"}', strftime('%Y-%m-%dT%H:%M:%fZ','now','-9 day'));
+
+-- Lets the sign-in screen show the demo accounts (local evaluation only).
+INSERT OR REPLACE INTO settings(key, value) VALUES ('demo_mode', '1');

@@ -16,7 +16,7 @@ export type Session = {
   user: User | null;
   csrf: string;
   setup_needed: boolean;
-  settings: { business_name: string; currency: string; portal_welcome: string };
+  settings: { business_name: string; currency: string; portal_welcome: string; demo_mode?: boolean };
   nav: Record<string, number>;
 };
 

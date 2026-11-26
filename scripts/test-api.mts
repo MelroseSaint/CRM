@@ -284,6 +284,14 @@ async function main(): Promise<void> {
       !(refreshedHome.data?.agreements ?? []).some((row: any) => row.id === Number(otherAgreement.data.id)),
   );
 
+  const milestoneKeys = Object.keys((portalProjectDetail.data?.milestones ?? [{}])[0] ?? {});
+  check(
+    'portal project milestones expose only client-facing columns',
+    milestoneKeys.length > 0 && !milestoneKeys.includes('amount_cents') && !milestoneKeys.includes('approved_note') &&
+      !milestoneKeys.includes('project_id'),
+    milestoneKeys,
+  );
+
   const sessionCookie = admin.loginSetCookies.find((value) => value.startsWith('anvil_session='));
   const secureContext = BASE.startsWith('https://');
   check(

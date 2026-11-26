@@ -95,6 +95,33 @@ export function Login() {
           <button className="btn accent" type="submit" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
+          {session?.settings.demo_mode ? (
+            <div className="demo-logins">
+              <div className="demo-title">Demo workspace — click an account to fill the form</div>
+              <button
+                type="button"
+                className="demo-login"
+                onClick={() => {
+                  setEmail('admin@anvil.test');
+                  setPassword('AnvilOps-2026!');
+                }}
+              >
+                <strong>Administrator</strong>
+                admin@anvil.test · AnvilOps-2026!
+              </button>
+              <button
+                type="button"
+                className="demo-login"
+                onClick={() => {
+                  setEmail('portal@anvil.test');
+                  setPassword('PortalPass-2026!');
+                }}
+              >
+                <strong>Client portal</strong>
+                portal@anvil.test · PortalPass-2026!
+              </button>
+            </div>
+          ) : null}
           <div className="auth-foot">
             {session?.setup_needed ? <>First run? <Link to="/setup">Create the administrator account</Link>.</> : 'Sessions expire after 12 hours.'}
           </div>

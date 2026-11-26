@@ -5,7 +5,7 @@ import type { AppVars, AuthUser } from '../lib/auth';
 import { audit, clientIp, hashPassword } from '../lib/auth';
 import type { Env } from '../lib/db';
 import { all, getSettings, insert, one, run, scalar, setSetting } from '../lib/db';
-import { ownedRow, ownedRows, ownedUpdate, projectChildRows } from '../lib/portal-scope';
+import { clientSelf, clientSummary, ownedRow, ownedRows, ownedUpdate, projectChildRows } from '../lib/portal-scope';
 import { addDays, nowIso, sha256Hex, today } from '../lib/util';
 import {
   fail, guardAdmin, guardClient, guardStaff, json, like, moneyField, nullable, pageParams, paged, readBody, str,
@@ -310,32 +310,51 @@ export function appConsoleRoutes() {
   app.get('/portal', async (c) => {
     const user = guardClient(c);
     if (user instanceof Response) return user;
-    const id = user.client_id as number;
-    const db = c.env.DB;
-    const [client, projects, invoices, agreements, documents, requests, websites, plans, activities] = await Promise.all([
-      one(db, 'SELECT id, name, company, email, phone FROM clients WHERE id=?', id),
-      all(db, `SELECT p.id, p.name, p.status, p.description, p.due_date, p.start_date,
-                (SELECT COUNT(*) FROM project_milestones m WHERE m.project_id=p.id AND m.status='done') AS done,
-                (SELECT COUNT(*) FROM project_milestones m WHERE m.project_id=p.id) AS total
-               FROM projects p WHERE p.client_id=? AND p.portal_visible=1 AND p.archived=0 ORDER BY p.created_at DESC`, id),
-      all(db, `SELECT id, number, status, total_cents, paid_cents, due_date, issue_date FROM invoices
-                WHERE client_id=? AND portal_visible=1 AND status <> 'draft' ORDER BY created_at DESC`, id),
-      all(db, `SELECT id, number, title, status, amount_cents, accepted_at, sent_at FROM agreements
-                WHERE client_id=? AND portal_visible=1 AND status IN ('sent','viewed','accepted','declined') ORDER BY created_at DESC`, id),
-      all(db, `SELECT id, name, category, size_bytes, created_at FROM documents WHERE client_id=? AND visibility='client' ORDER BY created_at DESC`, id),
-      all(db, `SELECT id, title, description, priority, status, submitted_at, completed_at FROM maintenance_requests
-                WHERE client_id=? ORDER BY created_at DESC LIMIT 50`, id),
-      all(db, `SELECT id, name, domain, production_url, status, last_health, last_check_at FROM websites
-                WHERE client_id=? AND portal_visible=1 ORDER BY name`, id),
-      all(db, `SELECT id, name, monthly_cents, services, next_service_date, status FROM maintenance_plans WHERE client_id=?`, id),
-      all(db, `SELECT id, type, subject, body, happened_at FROM activities WHERE client_id=? AND visibility='client' ORDER BY happened_at DESC LIMIT 20`, id),
-    ]);
-    const totals = await one<Record<string, number>>(
-      db,
-      `SELECT (SELECT COALESCE(SUM(total_cents-paid_cents),0) FROM invoices WHERE client_id=? AND status IN ('unpaid','partially_paid','overdue')) AS outstanding_cents,
-              (SELECT COALESCE(SUM(amount_cents),0) FROM payments WHERE client_id=? AND status='confirmed') AS paid_cents`,
-      id, id,
-    );
+    const id = user.client_id;
+    const [client, projects, invoices, agreements, documents, requests, websites, plans, activities] =
+      await Promise.all([
+        clientSelf<Record<string, unknown>>(c, id, { columns: 'id, name, company, email, phone' }),
+        ownedRows<Record<string, unknown>>(c, 'projects', id, {
+          columns: `id, name, status, description, due_date, start_date,
+            (SELECT COUNT(*) FROM project_milestones m WHERE m.project_id = projects.id AND m.status = 'done') AS done,
+            (SELECT COUNT(*) FROM project_milestones m WHERE m.project_id = projects.id) AS total`,
+          where: 'AND portal_visible = 1 AND archived = 0',
+          orderBy: 'ORDER BY created_at DESC',
+        }),
+        ownedRows(c, 'invoices', id, {
+          columns: 'id, number, status, total_cents, paid_cents, due_date, issue_date',
+          where: "AND portal_visible = 1 AND status <> 'draft'",
+          orderBy: 'ORDER BY created_at DESC',
+        }),
+        ownedRows(c, 'agreements', id, {
+          columns: 'id, number, title, status, amount_cents, accepted_at, sent_at',
+          where: "AND portal_visible = 1 AND status IN ('sent','viewed','accepted','declined')",
+          orderBy: 'ORDER BY created_at DESC',
+        }),
+        ownedRows(c, 'documents', id, {
+          columns: 'id, name, category, size_bytes, created_at',
+          where: "AND visibility = 'client'",
+          orderBy: 'ORDER BY created_at DESC',
+        }),
+        ownedRows(c, 'maintenance_requests', id, {
+          columns: 'id, title, description, priority, status, submitted_at, completed_at',
+          orderBy: 'ORDER BY created_at DESC LIMIT 50',
+        }),
+        ownedRows(c, 'websites', id, {
+          columns: 'id, name, domain, production_url, status, last_health, last_check_at',
+          where: 'AND portal_visible = 1',
+          orderBy: 'ORDER BY name',
+        }),
+        ownedRows(c, 'maintenance_plans', id, {
+          columns: 'id, name, monthly_cents, services, next_service_date, status',
+        }),
+        ownedRows(c, 'activities', id, {
+          columns: 'id, type, subject, body, happened_at',
+          where: "AND visibility = 'client'",
+          orderBy: 'ORDER BY happened_at DESC LIMIT 20',
+        }),
+      ]);
+    const totals = await clientSummary(c, id);
     return json({ client, projects, invoices, agreements, documents, requests, websites, plans, activities, totals });
   });
 
@@ -351,6 +370,7 @@ export function appConsoleRoutes() {
     if (!project) return fail(404, 'Project not found.');
     const [milestones, deliverables, invoices, activity] = await Promise.all([
       projectChildRows<Record<string, unknown>>(c, 'project_milestones', id, user.client_id, {
+        columns: 'x.id, x.title, x.description, x.due_date, x.status, x.requires_approval, x.approved_at, x.sort',
         orderBy: 'ORDER BY x.sort, x.id',
       }),
       projectChildRows<Record<string, unknown>>(c, 'project_deliverables', id, user.client_id, {
@@ -358,11 +378,12 @@ export function appConsoleRoutes() {
         orderBy: 'ORDER BY x.created_at',
       }),
       projectChildRows<Record<string, unknown>>(c, 'invoices', id, user.client_id, {
-        columns: 'id, number, status, total_cents, paid_cents, due_date',
+        columns: 'x.id, x.number, x.status, x.total_cents, x.paid_cents, x.due_date',
         where: "AND x.portal_visible = 1 AND x.status <> 'draft'",
         orderBy: 'ORDER BY x.created_at DESC',
       }),
       projectChildRows<Record<string, unknown>>(c, 'activities', id, user.client_id, {
+        columns: 'x.id, x.type, x.subject, x.body, x.happened_at',
         where: "AND x.visibility = 'client'",
         orderBy: 'ORDER BY x.happened_at DESC LIMIT 20',
       }),
@@ -436,11 +457,12 @@ export function appConsoleRoutes() {
     });
     if (!ag) return fail(404, 'Agreement not found.');
     if (ag.status === 'sent') {
-      await ownedUpdate(c, 'agreements', id, user.client_id, {
+      const changed = await ownedUpdate(c, 'agreements', id, user.client_id, {
         status: 'viewed',
         viewed_at: nowIso(),
         updated_at: nowIso(),
       });
+      if (!changed) return fail(404, 'Agreement not found.');
     }
     return json({ ok: true });
   });
@@ -472,7 +494,7 @@ export function appConsoleRoutes() {
       agreement.extra_conditions,
     ].join('\u001f');
     const hash = await sha256Hex(content);
-    await ownedUpdate(c, 'agreements', id, user.client_id, {
+    const accepted = await ownedUpdate(c, 'agreements', id, user.client_id, {
       status: 'accepted',
       accepted_at: nowIso(),
       accepted_by: name,
@@ -480,6 +502,7 @@ export function appConsoleRoutes() {
       accepted_hash: hash,
       updated_at: nowIso(),
     });
+    if (!accepted) return fail(404, 'Agreement not found.');
     await audit(c, 'agreement.accepted', 'agreement', id, { accepted_by: name, hash });
     return json({ ok: true, hash });
   });

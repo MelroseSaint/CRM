@@ -229,3 +229,38 @@ button.tab.active { color: var(--ink); border-bottom-color: var(--accent); font-
   table.data { font-size: 12.5px; }
   table.data th, table.data td { padding: 9px 10px; }
 }
+
+/* demo workspace hint on the sign-in screen */
+.demo-logins {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf6;
+  padding: 11px;
+  display: grid;
+  gap: 7px;
+}
+.demo-title {
+  font-size: 9.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.demo-login {
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.demo-login strong {
+  display: block;
+  font-size: 12px;
+}
+.demo-login:hover {
+  border-color: var(--accent);
+}
