@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "wrangler dev --port 3000 --ip 0.0.0.0 --local",
     "dev:web": "npm --prefix web run dev",
-    "build": "npm --prefix web run build",
+    "build": "npm run db:embed-schema && npm --prefix web run build",
     "web:install": "npm --prefix web ci --no-audit --no-fund",
     "db:init": "wrangler d1 execute anvil-ops --local --file=src/db/schema.sql",
     "db:init:remote": "wrangler d1 execute anvil-ops --remote --file=src/db/schema.sql",
@@ -21,7 +21,8 @@
     "sdk:build": "cd sdk && npm install --no-audit --no-fund && npm run build",
     "sdk:typecheck": "cd sdk && npm install --no-audit --no-fund && npm run typecheck",
     "dev:node": "tsx src/node/server.ts",
-    "db:init:node": "tsx scripts/db-init-node.mts"
+    "db:init:node": "tsx scripts/db-init-node.mts",
+    "db:embed-schema": "tsx scripts/embed-schema.mts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",

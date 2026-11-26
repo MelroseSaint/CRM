@@ -9,7 +9,8 @@
 import { Hono } from 'hono';
 import { app } from './index';
 import type { Env } from './lib/db';
-import { loadEnv } from './node/env';
+import { databaseConfig, loadEnv } from './node/env';
+import { ensureSchema } from './node/schema';
 
 let cachedEnv: Env | null = null;
 
@@ -57,6 +58,15 @@ server.use('*', async (c, next) => {
       console.error('anvil: configuration error', err);
       return failure(c, 503, 'server_not_configured', databaseMessage(err));
     }
+  }
+  try {
+    // Serverless deployments have no shell step, so the schema is applied on the
+    // first request against an empty database; later requests reuse the promise.
+    const { url, authToken } = databaseConfig();
+    await ensureSchema(url, authToken);
+  } catch (err) {
+    console.error('anvil: schema bootstrap failed', err);
+    return failure(c, 503, 'database_unavailable', databaseMessage(err));
   }
   try {
     await next();

@@ -5,7 +5,8 @@ import { mkdirSync } from 'node:fs';
 import { serve } from '@hono/node-server';
 import { app } from '../index';
 import type { Env } from '../lib/db';
-import { loadEnv } from './env';
+import { databaseConfig, loadEnv } from './env';
+import { ensureSchema } from './schema';
 import { diskAssets } from './static';
 
 const loaded = loadEnv();
@@ -20,6 +21,14 @@ if (url.startsWith('file:')) {
 }
 
 const env: Env = { ...loaded, ASSETS: diskAssets(process.env.ASSETS_DIR?.trim() || 'web/dist') };
+
+// A fresh database gets the schema before the first request, so `npm run dev:node`
+// works without a manual init step (the init script is still used to seed demo data).
+const { url: dbUrl, authToken } = databaseConfig();
+await ensureSchema(dbUrl, authToken).catch((err: unknown) => {
+  console.error('anvil: could not prepare the database schema', err);
+});
+
 const port = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? '0.0.0.0';
 

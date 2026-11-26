@@ -26,10 +26,8 @@ function loadDotEnv(): void {
 
 let cached: Env | null = null;
 
-export function loadEnv(): Env {
-  if (cached) return cached;
+export function databaseConfig(): { url: string; authToken?: string } {
   loadDotEnv();
-
   // Accept the names Turso's own CLI and dashboard use, so a copied connection
   // string does not fail just because it was stored as TURSO_DATABASE_URL.
   const configured = (process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL)?.trim();
@@ -49,7 +47,12 @@ export function loadEnv(): Env {
         'Use a libSQL URL (libsql:// or https://) with DATABASE_AUTH_TOKEN instead.',
     );
   }
-  const url = configured || DEFAULT_DATABASE_URL;
+  return { url: configured || DEFAULT_DATABASE_URL, authToken };
+}
+
+export function loadEnv(): Env {
+  if (cached) return cached;
+  const { url, authToken } = databaseConfig();
   const db = createLibsqlDb(url, authToken);
 
   // The SPA is served by the `web` service on Vercel, so no disk assets here;
